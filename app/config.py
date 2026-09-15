@@ -40,8 +40,7 @@ class Settings(BaseSettings):
 
     # 大模型模型名字
     llm_model: str = "mock"
-    # 用户上传图片时使用的视觉模型。当前为空，表示暂时没有配置
-    llm_vision_model:str|None=None
+
     # 大模型接口地址
     llm_base_url: str | None = None
     # 大模型 API 密钥
