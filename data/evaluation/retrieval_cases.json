@@ -1,0 +1,29 @@
+[
+  {
+    "case_id": "drill_indicator",
+    "question": "我的DCB107或DCB112型号电钻指示灯闪烁，这些闪烁标识代表什么含义？",
+    "expected_product": "电钻",
+    "expected_image_ids": [
+      "drill0_04",
+      "drill0_05",
+      "drill0_06"
+    ]
+  },
+  {
+    "case_id": "fitness_tracker_band",
+    "question": "我想更换健身追踪器的表带，有其他尺寸可选吗？",
+    "expected_product": "健身追踪器",
+    "expected_image_ids": [
+      "Manual16_51",
+      "Manual16_52"
+    ]
+  },
+  {
+    "case_id": "drill_temperature",
+    "expected_product": "电钻",
+    "question": "电钻电池温度太高时为什么不能马上充电？",
+    "expected_image_ids": [
+      "drill0_06"
+    ]
+  }
+]

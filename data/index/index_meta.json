@@ -1,0 +1,7 @@
+{
+  "model_name": "BAAI/bge-small-zh-v1.5",
+  "record_count": 778,
+  "embedding_dimension": 512,
+  "normalized": true,
+  "created_at": "2026-09-07T14:14:50.325627+00:00"
+}
