@@ -1,4 +1,7 @@
-from app.llm_client import sanitize_answer
+import json
+
+from app.llm_client import parse_structured_output
+
 
 def main() -> None:
     raw_answer = (
@@ -6,11 +9,35 @@ def main() -> None:
         "安装表带（参考资料9、资料10）。"
         "参考资料3说明表带应舒适贴合。"
         "手册第14页需要保留。"
+        "推荐参考图片："
+        "Manual16_9（拆卸表带）、"
+        "Manual16_11（安装表带）。"
+        "相关操作示意图请参考："
+        "Manual16_9、Manual16_11。"
+        "如需参考具体操作示意图，"
+        "请查看相关说明图片。"
     )
 
-    clean_answer = sanitize_answer(
-        answer=raw_answer,
-        candidate_image_ids=[],
+    raw_output = json.dumps(
+        {
+            "answer": raw_answer,
+            "image_ids": [
+                "Manual16_9",
+                "Manual16_11",
+            ],
+        },
+        ensure_ascii=False,
+    )
+
+    clean_answer, selected_image_ids = (
+        parse_structured_output(
+            raw_output=raw_output,
+            candidate_image_ids=[
+                "Manual16_9",
+                "Manual16_11",
+            ],
+            max_images=3,
+        )
     )
 
     expected_answer = (
@@ -26,19 +53,31 @@ def main() -> None:
     print("\n清洗结果：")
     print(clean_answer)
 
+    print("\n保留的图片ID：")
+    print(selected_image_ids)
+
     checks = {
-        "删除单个资料编号": (
-            "参考资料10" not in clean_answer
-        ),
-        "删除多个资料编号": (
-            "资料9" not in clean_answer
+        "删除资料编号": (
+            "参考资料" not in clean_answer
             and "资料10" not in clean_answer
+        ),
+        "删除图片推荐文字": (
+            "推荐参考图片" not in clean_answer
+            and "相关操作示意图请参考"
+            not in clean_answer
+            and "相关示意图" not in clean_answer
+            and "如需参考具体操作示意图"
+            not in clean_answer
         ),
         "保留可理解的页码": (
             "手册第14页" in clean_answer
         ),
-        "清洗结果完全符合预期": (
+        "回答清洗结果正确": (
             clean_answer == expected_answer
+        ),
+        "结构化图片ID仍然保留": (
+            selected_image_ids
+            == ["Manual16_9", "Manual16_11"]
         ),
     }
 

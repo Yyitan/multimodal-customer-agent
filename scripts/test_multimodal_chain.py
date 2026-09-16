@@ -91,6 +91,28 @@ def main() -> None:
         result["answer"],
     )
 
+    answer_sentences = re.split(
+        r"[。！？\n]",
+        result["answer"],
+    )
+
+    leaked_image_recommendation_sentences = [
+        sentence
+        for sentence in answer_sentences
+        if (
+            "图片" in sentence
+            or "示意图" in sentence
+        )
+        and any(
+            cue in sentence
+            for cue in (
+                "查看",
+                "参考",
+                "参见",
+            )
+        )
+    ]
+
     print("\n====运行指标====")
     for name, value in metrics.items():
         print(f"{name}:{value}")
@@ -105,9 +127,7 @@ def main() -> None:
         "确实收到1张用户图片": (metrics["input_image_count"] == 1),
         "确实启用了视觉模型": (metrics["vision_used"] is True),
         "视觉预分析已调用": (metrics["vision_analysis_called"] is True),
-        "视觉预分析有耗时": (
-            metrics["vision_analysis_latency_ms"] > 0
-        ),
+        "视觉预分析有耗时": (metrics["vision_analysis_latency_ms"] > 0),
         "视觉预分析记录了Token": (
             metrics["vision_analysis_total_tokens"] is not None
             and metrics["vision_analysis_total_tokens"] > 0
@@ -120,6 +140,7 @@ def main() -> None:
         "返回图片均来自候选资料": (returned_image_ids <= allowed_image_ids),
         "回答正文没有泄露图片ID": (not leaked_image_ids),
         "回答正文没有泄露资料编号": (not leaked_reference_markers),
+        "回答正文没有重复推荐图片": (not leaked_image_recommendation_sentences),
     }
 
     all_passed = True

@@ -54,6 +54,9 @@ def build_user_prompt(question:str,context:str,image_ids:list[str],max_answer_im
 - answer字段中禁止出现任何候选图片ID。
 - answer字段中禁止出现“资料1”“资料2”“参考资料3”等内部编号。
 - 不要在answer中列出“推荐图片”“参考图片”或图片文件名。
+- answer字段中不要描述、推荐或列举图片，也不要使用“查看图片”“参考图片”“相关示意图”等表达。
+- 无论“查看/参考/参见”出现在“图片/示意图”前面还是后面，answer都不得包含这类图片引导语。
+- 所有图片只能通过image_ids字段返回，由前端单独展示。
 - 不要使用“见资料X”“参考资料X”等内部引用表达。
 - 图片只通过image_ids字段返回，由系统单独展示。
 

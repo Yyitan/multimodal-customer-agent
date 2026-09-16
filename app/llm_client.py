@@ -76,40 +76,32 @@ def _create_client(
 # 私有函数：配置校验+获取客户端
 def _get_client(
     settings: Settings,
-    use_vision:bool=False,
-    ) -> OpenAI:
+    use_vision: bool = False,
+) -> OpenAI:
     """检查模型配置并取得客户端。"""
 
     # 判断哪一套配置
     if use_vision:
-        api_key_setting=settings.llm_vision_api_key
-        base_url=settings.llm_vision_base_url
+        api_key_setting = settings.llm_vision_api_key
+        base_url = settings.llm_vision_base_url
     else:
-        api_key_setting=settings.llm_api_key
-        base_url=settings.llm_base_url
+        api_key_setting = settings.llm_api_key
+        base_url = settings.llm_base_url
 
     # 判断密钥有没有配置
     if api_key_setting is None:
         if use_vision:
-            raise LLMClientError(
-                "未配置视觉模型API Key,请检查 .env文件."
-            )
-        raise LLMClientError(
-            "未配置大模型API Key,请检查 .env文件"
-        )
+            raise LLMClientError("未配置视觉模型API Key,请检查 .env文件.")
+        raise LLMClientError("未配置大模型API Key,请检查 .env文件")
 
     # 取出真实密钥字符串,去除首尾空格
-    api_key=api_key_setting.get_secret_value().strip()
+    api_key = api_key_setting.get_secret_value().strip()
     # 判断key是不是空字符
     if not api_key:
         if use_vision:
-            raise LLMClientError(
-                "视觉模型 API Key 不能为空."
-            )
+            raise LLMClientError("视觉模型 API Key 不能为空.")
 
-        raise LLMClientError(
-            "大模型API Key不能为空。"
-        )
+        raise LLMClientError("大模型API Key不能为空。")
 
     # 创建OpenAI客户端
     return _create_client(
@@ -118,16 +110,17 @@ def _get_client(
         timeout_seconds=settings.llm_timeout_seconds,
     )
 
+
 def sanitize_answer(
-    answer:str,
-    candidate_image_ids:list[str],
-)->str:
+    answer: str,
+    candidate_image_ids: list[str],
+) -> str:
     """防止内部知识库图片ID出现在用户可见回答中。"""
     # 所以就是把大模型暴露出的内部图片ID，同义替换为中文“相关示意图”
-    clean_answer=answer
+    clean_answer = answer
     # 先处理较长的ID，避免一个短ID恰好是长ID的一部分。(image_01,image010:如果先替换短的 那么长的就变成相关示意图0)
     # 按字符串长度从长到短排序
-    unqiue_image_ids=sorted(
+    unqiue_image_ids = sorted(
         # `set(candidate_image_ids)`：去重。候选列表可能重复出现同一个图片 ID，转集合删掉重复项。
         set(candidate_image_ids),
         key=len,
@@ -136,21 +129,17 @@ def sanitize_answer(
 
     # 只要文本里面出现这个图片 ID，就替换成中文文字`相关示意图`
     for image_id in unqiue_image_ids:
-        clean_answer=clean_answer.replace(
+        clean_answer = clean_answer.replace(
             image_id,
             "相关示意图",
         )
 
     reference_sequence_pattern = (
-        r"(?:参考)?资料\s*\d+"
-        r"(?:\s*[、,，]\s*"
-        r"(?:(?:参考)?资料\s*)?\d+)*"
+        r"(?:参考)?资料\s*\d+" r"(?:\s*[、,，]\s*" r"(?:(?:参考)?资料\s*)?\d+)*"
     )
 
     parenthesized_reference_pattern = (
-        rf"[（(]\s*"
-        rf"{reference_sequence_pattern}"
-        rf"\s*[）)]"
+        rf"[（(]\s*" rf"{reference_sequence_pattern}" rf"\s*[）)]"
     )
 
     # 删除只用于标注内部资料编号的括号。
@@ -167,7 +156,44 @@ def sanitize_answer(
         clean_answer,
     )
 
+    image_guidance_sentence_pattern = (
+        r"[^。！？\n]*"
+        r"(?:"
+        r"(?:查看|参考|参见)"
+        r"[^。！？\n]*"
+        r"(?:图片|示意图)"
+        r"|"
+        r"(?:图片|示意图)"
+        r"[^。！？\n]*"
+        r"(?:查看|参考|参见)"
+        r")"
+        r"[^。！？\n]*"
+        r"[。！？]?"
+    )
+
+    # 删除包含图片查看引导的完整句子。
+    clean_answer = re.sub(
+        image_guidance_sentence_pattern,
+        "",
+        clean_answer,
+    )
+
+    image_label_sentence_pattern = (
+        r"[^。！？\n]*"
+        r"(?:相关|参考)图片\s*[：:]"
+        r"[^。！？\n]*"
+        r"[。！？]?"
+    )
+
+    # 删除“相关图片：……”这类没有查看动词的图片列表。
+    clean_answer = re.sub(
+        image_label_sentence_pattern,
+        "",
+        clean_answer,
+    )
+
     return clean_answer.strip()
+
 
 # raw_output:大模型原始返回的字符串;candidate_image_ids:候选图片 ID 列表;
 def parse_structured_output(
@@ -234,7 +260,7 @@ def parse_structured_output(
         if len(selected_image_ids) >= max_images:
             break
 
-    clean_answer=sanitize_answer(
+    clean_answer = sanitize_answer(
         answer=answer,
         candidate_image_ids=candidate_image_ids,
     )
@@ -274,29 +300,27 @@ def generate_answer(
         )
 
     # 从Prompt数据包中读取用户上传的图片
-    user_images=prompt_package.get(
+    user_images = prompt_package.get(
         "user_images",
         [],
     )
 
     # 只要用户上传了图片,就使用视觉模型.(把列表转布尔值:空列表,False,没图片,用文本模型;列表有图片字符串,True,视觉模型)
-    use_vision=bool(user_images)
+    use_vision = bool(user_images)
 
     if use_vision:
-        request_provider=settings.llm_vision_provider
-        request_model=settings.llm_vision_model
+        request_provider = settings.llm_vision_provider
+        request_model = settings.llm_vision_model
 
         # 如果开启视觉模式，但是视觉模型名字为空，直接抛出异常
         if not request_model:
-            raise LLMClientError(
-                "请求包含图片,但没有配置视觉模型名称."
-            )
+            raise LLMClientError("请求包含图片,但没有配置视觉模型名称.")
     else:
-        request_provider=settings.llm_provider
-        request_model=settings.llm_model
+        request_provider = settings.llm_provider
+        request_model = settings.llm_model
 
     # 根据use_vision选择对应的API Key 和Base URL.
-    client=_get_client(
+    client = _get_client(
         settings,
         use_vision=use_vision,
     )
@@ -369,10 +393,7 @@ def generate_answer(
                 "model": request_model,
                 # 消息结构：`messages`数组，区分 system 角色和 user 角色。
                 "messages": [
-                    {
-                        "role": "system",
-                        "content": prompt_package["system_prompt"]
-                    },
+                    {"role": "system", "content": prompt_package["system_prompt"]},
                     {
                         "role": "user",
                         "content": user_content,
