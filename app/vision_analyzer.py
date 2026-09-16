@@ -5,12 +5,8 @@ from app.config import Settings
 from app.llm_client import LLMClientError, generate_answer
 from app.retriever import KNOWLEDGE_RECORDS
 
-KNOWN_PRODUCTS=sorted(
-    {
-        record["product"]
-        for record in KNOWLEDGE_RECORDS
-        if record.get("product")
-    }
+KNOWN_PRODUCTS = sorted(
+    {record["product"] for record in KNOWLEDGE_RECORDS if record.get("product")}
 )
 
 
@@ -81,115 +77,108 @@ def analyze_images_for_retrieval(
     prompt_package = {
         "system_prompt": VISION_ANALYSIS_SYSTEM_PROMPT,
         # `.format()` 是字符串方法：把`{question}`占位替换成真实 question 文本
-        "user_prompt": VISION_ANALYSIS_USER_PROMPT.format(question=question.strip(),known_products="、".join(KNOWN_PRODUCTS),),
+        "user_prompt": VISION_ANALYSIS_USER_PROMPT.format(
+            question=question.strip(),
+            known_products="、".join(KNOWN_PRODUCTS),
+        ),
         "user_images": images,
         "image_ids": [],
         "max_answer_images": 1,
         "record_count": 0,
         "context_length": 0,
     }
-    
-    result=generate_answer(
+
+    result = generate_answer(
         prompt_package=prompt_package,
         settings=settings,
     )
-    
+
     try:
-        analysis=json.loads(result.answer)
+        analysis = json.loads(result.answer)
     except json.JSONDecodeError as error:
-        raise LLMClientError(
-            "视觉预分析没有返回合法JOSN。"
-        ) from error
-    
-    if not isinstance(analysis,dict):
-        raise LLMClientError(
-            "视觉预分析结果必须是JSON对象。"
-        )
+        raise LLMClientError("视觉预分析没有返回合法JOSN。") from error
+
+    if not isinstance(analysis, dict):
+        raise LLMClientError("视觉预分析结果必须是JSON对象。")
     # `dict.get(key, 默认值)`：字典安全取值方法
     # 如果字典里存在这个 key，就拿它的值；**如果 key 不存在，返回第二个参数的默认值**
-    product_hint=analysis.get(
+    product_hint = analysis.get(
         "product_hint",
         "",
     )
-    
-    visual_keywords=analysis.get(
+
+    visual_keywords = analysis.get(
         "visual_keywords",
         [],
     )
-    
-    visual_description=analysis.get(
+
+    visual_description = analysis.get(
         "visual_description",
         "",
     )
 
-    if not isinstance(product_hint,str):
-        product_hint=""
-    
-    if not isinstance(visual_keywords,list):
-        visual_keywords=[]
-    
-    visual_keywords=[
+    if not isinstance(product_hint, str):
+        product_hint = ""
+    product_hint = product_hint.strip()
+    if product_hint not in KNOWN_PRODUCTS:
+        product_hint = ""
+
+    if not isinstance(visual_keywords, list):
+        visual_keywords = []
+
+    visual_keywords = [
         # 遍历`visual_keywords`里面每一个 keyword，必须是字符串
         keyword.strip()
         for keyword in visual_keywords
         # 必须是字符串且去掉首尾空格不为空 放进新列表
-        if isinstance(keyword,str)
-        and keyword.strip()
+        if isinstance(keyword, str) and keyword.strip()
     ]
-    
-    if not isinstance(visual_description,str):
-        visual_description=""
-    
+
+    if not isinstance(visual_description, str):
+        visual_description = ""
+
     return {
-        "product_hint":product_hint,
-        "visual_keywords":visual_keywords,
-        "visual_description":visual_description.strip(),
-        "latency_ms":result.latency_ms,
-        "prompt_tokens":result.prompt_tokens,
-        "completion_tokens":result.completion_tokens,
-        "total_tokens":result.total_tokens,
+        "product_hint": product_hint,
+        "visual_keywords": visual_keywords,
+        "visual_description": visual_description.strip(),
+        "latency_ms": result.latency_ms,
+        "prompt_tokens": result.prompt_tokens,
+        "completion_tokens": result.completion_tokens,
+        "total_tokens": result.total_tokens,
     }
-    
+
 
 def build_multimodal_retrieval_query(
-    question:str,
-    analysis:dict[str,Any],
-)->str:
+    question: str,
+    analysis: dict[str, Any],
+) -> str:
     """把视觉分析结果合并到原始问题中，形成增强检索问题。"""
-    
-    parts=[
+
+    parts = [
         f"用户问题：{question.strip()}",
     ]
-    
-    product_hint=analysis.get(
+
+    product_hint = analysis.get(
         "product_hint",
         "",
     )
-    
+
     if product_hint:
-        parts.append(
-            f"图片识别到的产品线索：{product_hint}"
-        )
-    
-    visual_keywords=analysis.get(
+        parts.append(f"图片识别到的产品线索：{product_hint}")
+
+    visual_keywords = analysis.get(
         "visual_keywords",
         [],
     )
-    
+
     if visual_keywords:
-        parts.append(
-            "图片关键词："
-            +"、".join(visual_keywords)
-        )
-    visual_description=analysis.get(
+        parts.append("图片关键词：" + "、".join(visual_keywords))
+    visual_description = analysis.get(
         "visual_description",
         "",
     )
-    
-    if visual_description:
-        parts.append(
-            f"图片可见内容：{visual_description}"
-        )
-        
-    return "\n".join(parts)
 
+    if visual_description:
+        parts.append(f"图片可见内容：{visual_description}")
+
+    return "\n".join(parts)
