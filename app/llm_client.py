@@ -2,6 +2,7 @@
 from functools import lru_cache
 from typing import Any
 import json
+import re
 
 # OpenAI SDK 内置异常类，用来捕获不同类型的接口报错
 from openai import (
@@ -78,7 +79,7 @@ def _get_client(
     use_vision:bool=False,
     ) -> OpenAI:
     """检查模型配置并取得客户端。"""
-    
+
     # 判断哪一套配置
     if use_vision:
         api_key_setting=settings.llm_vision_api_key
@@ -86,7 +87,7 @@ def _get_client(
     else:
         api_key_setting=settings.llm_api_key
         base_url=settings.llm_base_url
-    
+
     # 判断密钥有没有配置
     if api_key_setting is None:
         if use_vision:
@@ -96,7 +97,7 @@ def _get_client(
         raise LLMClientError(
             "未配置大模型API Key,请检查 .env文件"
         )
-    
+
     # 取出真实密钥字符串,去除首尾空格
     api_key=api_key_setting.get_secret_value().strip()
     # 判断key是不是空字符
@@ -105,11 +106,11 @@ def _get_client(
             raise LLMClientError(
                 "视觉模型 API Key 不能为空."
             )
-        
+
         raise LLMClientError(
             "大模型API Key不能为空。"
         )
-    
+
     # 创建OpenAI客户端
     return _create_client(
         api_key=api_key,
@@ -132,14 +133,40 @@ def sanitize_answer(
         key=len,
         reverse=True,
     )
-    
+
     # 只要文本里面出现这个图片 ID，就替换成中文文字`相关示意图`
     for image_id in unqiue_image_ids:
         clean_answer=clean_answer.replace(
             image_id,
             "相关示意图",
         )
-    
+
+    reference_sequence_pattern = (
+        r"(?:参考)?资料\s*\d+"
+        r"(?:\s*[、,，]\s*"
+        r"(?:(?:参考)?资料\s*)?\d+)*"
+    )
+
+    parenthesized_reference_pattern = (
+        rf"[（(]\s*"
+        rf"{reference_sequence_pattern}"
+        rf"\s*[）)]"
+    )
+
+    # 删除只用于标注内部资料编号的括号。
+    clean_answer = re.sub(
+        parenthesized_reference_pattern,
+        "",
+        clean_answer,
+    )
+
+    # 没有括号的内部编号替换为用户可以理解的普通称呼。
+    clean_answer = re.sub(
+        reference_sequence_pattern,
+        "知识库资料",
+        clean_answer,
+    )
+
     return clean_answer.strip()
 
 # raw_output:大模型原始返回的字符串;candidate_image_ids:候选图片 ID 列表;
@@ -206,12 +233,12 @@ def parse_structured_output(
         # 达到图片上限，立刻停止循环
         if len(selected_image_ids) >= max_images:
             break
-    
+
     clean_answer=sanitize_answer(
         answer=answer,
         candidate_image_ids=candidate_image_ids,
     )
-    
+
     return clean_answer, selected_image_ids
 
 
@@ -251,14 +278,14 @@ def generate_answer(
         "user_images",
         [],
     )
-    
+
     # 只要用户上传了图片,就使用视觉模型.(把列表转布尔值:空列表,False,没图片,用文本模型;列表有图片字符串,True,视觉模型)
     use_vision=bool(user_images)
-    
+
     if use_vision:
         request_provider=settings.llm_vision_provider
         request_model=settings.llm_vision_model
-        
+
         # 如果开启视觉模式，但是视觉模型名字为空，直接抛出异常
         if not request_model:
             raise LLMClientError(
@@ -267,7 +294,7 @@ def generate_answer(
     else:
         request_provider=settings.llm_provider
         request_model=settings.llm_model
-        
+
     # 根据use_vision选择对应的API Key 和Base URL.
     client=_get_client(
         settings,
@@ -343,7 +370,7 @@ def generate_answer(
                 # 消息结构：`messages`数组，区分 system 角色和 user 角色。
                 "messages": [
                     {
-                        "role": "system", 
+                        "role": "system",
                         "content": prompt_package["system_prompt"]
                     },
                     {
@@ -363,7 +390,7 @@ def generate_answer(
                 request_options["extra_body"] = {
                     "enable_thinking": settings.llm_vision_thinking,
                 }
-            
+
             elif settings.llm_thinking is not None:
                 # 智谱 GLM 使用 thinking.type 参数
                 request_options["extra_body"] = {
