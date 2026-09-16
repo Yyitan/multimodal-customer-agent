@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 
 # 用来规定接口JSON的格式，并自动检查用户传的数据是否合格
 # `field_validator`：Pydantic 的字段校验装饰器，
-from pydantic import BaseModel, Field,field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.config import get_settings
 from app.services.chat_service import answer_question
@@ -32,45 +32,38 @@ class ChatRequest(BaseModel):
     images: list[str] = Field(
         default_factory=list,
         max_length=3,
-        description=(
-            "Optional Base64 data URLs. "
-            "Up to 3 images are allowed."
-        )
+        description=("Optional Base64 data URLs. " "Up to 3 images are allowed."),
     )
-    
+
     # 绑定这个校验函数，专门校验`images`这个字段。
     @field_validator("images")
     # 固定写法，Pydantic v2 要求。
     @classmethod
     # 触发时机：前端 POST 请求到达 FastAPI，在代码进入`/chat`接口函数之前自动执行。只要校验抛`ValueError`，FastAPI 直接返回`422 Unprocessable Entity`，后面所有业务代码完全不会跑。
-    def validate(cls, values:list[str])->list[str]:
+    def validate(cls, values: list[str]) -> list[str]:
         """检查用户上传图片是否是允许的Base64 Data URL。"""
         # Base64 DataURL 格式：图片二进制直接放在 JSON 请求体里面，不需要服务器保存图片文件，接口直接拿到图片内容传给多模态大模型。
-        allowed_prefixes=(
+        allowed_prefixes = (
             "data:image/jpeg;base64",
             "data:image/jpg;base64",
             "data:image/png;base64",
             "data:image/webp;base64",
         )
-        
+
         # `values` 就是用户传进来的图片字符串列表，循环遍历每一张图片。
         for image in values:
-            if not isinstance(image,str):
+            if not isinstance(image, str):
                 raise ValueError("每张图片必须是字符串。")
-            
+
             # 判断字符串是否以其中任意一个前缀开头
             if not image.startswith(allowed_prefixes):
-                raise ValueError(
-                    "图片必须是JPEG、PNG或WEBP的Base64 Data URL。"
-                )
+                raise ValueError("图片必须是JPEG、PNG或WEBP的Base64 Data URL。")
             # 防止单张图片过大，避免请求体无限膨胀。
-            if len(image)>8_000_000:
-                raise ValueError(
-                    "单张图片过大，Base64字符串不能超过8MB。"
-                )
-                
+            if len(image) > 8_000_000:
+                raise ValueError("单张图片过大，Base64字符串不能超过8MB。")
+
         return values
-    
+
     session_id: str | None = Field(default=None, description="Conversation ID")
     # 是否流式返回,接口先预留
     stream: bool = Field(default=False, description="Whether to stream the response")
@@ -99,11 +92,14 @@ class ChatMetrics(BaseModel):
     completion_tokens: int | None
     total_tokens: int | None
     llm_latency_ms: int
-    vision_analysis_called:bool
-    vision_analysis_latency_ms:int
-    vision_analysis_prompt_tokens:int|None
-    vision_analysis_completion_tokens:int|None
-    vision_analysis_total_tokens:int|None
+    vision_analysis_called: bool
+    vision_analysis_latency_ms: int
+    vision_analysis_prompt_tokens: int | None
+    vision_analysis_completion_tokens: int | None
+    vision_analysis_total_tokens: int | None
+    vision_analysis_succeeded: bool
+    vision_fallback_used: bool
+    vision_analysis_error: str | None
     retrieval_latency_ms: int
     total_latency_ms: int
     retrieved_record_count: int
@@ -111,8 +107,8 @@ class ChatMetrics(BaseModel):
     context_length: int
     finish_reason: str | None
     selected_image_count: int
-    input_image_count:int
-    vision_used:bool
+    input_image_count: int
+    vision_used: bool
 
 
 # 规定真正业务结果的格式
@@ -197,7 +193,10 @@ def chat(
     session_id = request.session_id or f"kf_session_{uuid4().hex[:12]}"
 
     try:
-        service_result = answer_question(request.question,images=request.images,)
+        service_result = answer_question(
+            request.question,
+            images=request.images,
+        )
 
     except LLMClientError as error:
         # 记录失败请求
@@ -215,24 +214,24 @@ def chat(
         raise HTTPException(status_code=503, detail=str(error)) from error
 
     # 把前面`build_metrics`生成的指标字典拿出来，方便后面读取。
-    metrics=service_result["metrics"]
+    metrics = service_result["metrics"]
     # `logger.info()`：输出普通成功信息日志
     logger.info(
         (
-            # 标记字符串`chat_completed`，一眼看出这是一次问答成功。
-            "chat_completed session_id=%s"
-            "provider=%s model=%s"
-            "vision_analysis_ms=%s retrieval_ms=%s"
-            "llm_ms=%s total_ms=%s"
-            "prompt_tokens=%s completion_tokens=%s"
-            "total_tokens=%s references=%s"
+            "chat_completed session_id=%s "
+            "provider=%s model=%s "
+            "vision_analysis_ms=%s vision_fallback=%s "
+            "retrieval_ms=%s llm_ms=%s total_ms=%s "
+            "prompt_tokens=%s completion_tokens=%s "
+            "total_tokens=%s references=%s "
             "finish_reason=%s selected_images=%s"
         ),
-        
+
         session_id,
         metrics["provider"],
         metrics["model"],
         metrics["vision_analysis_latency_ms"],
+        metrics["vision_fallback_used"],
         metrics["retrieval_latency_ms"],
         metrics["llm_latency_ms"],
         metrics["total_latency_ms"],
@@ -242,9 +241,9 @@ def chat(
         metrics["context_record_count"],
         metrics["finish_reason"],
         metrics["selected_image_count"],
-    )     
-    # 示例：2026-09-10 21:00:00,123 | INFO | app.main | chat_completed session_id=ses_001 provider=mock model=mock retrieval_ms=35 llm_ms=12 total_ms=160 prompt_tokens=210 completion_tokens=85 total_tokens=295 references=3 finish_reason=stop selected_images=2  
-    
+    )
+    # 示例：2026-09-10 21:00:00,123 | INFO | app.main | chat_completed session_id=ses_001 provider=mock model=mock retrieval_ms=35 llm_ms=12 total_ms=160 prompt_tokens=210 completion_tokens=85 total_tokens=295 references=3 finish_reason=stop selected_images=2
+
     references = [
         # record:record 本来是一个字典,会把字典中的键和值转换成参数:字典的键 → 参数名,字典的值 → 参数值
         KnowledgeReference(**record)

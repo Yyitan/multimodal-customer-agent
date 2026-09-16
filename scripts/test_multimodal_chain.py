@@ -105,11 +105,16 @@ def main() -> None:
         "确实收到1张用户图片": (metrics["input_image_count"] == 1),
         "确实启用了视觉模型": (metrics["vision_used"] is True),
         "视觉预分析已调用": (metrics["vision_analysis_called"] is True),
-        "视觉预分析有耗时":metrics["vision_analysis_called"] is True,
-        "视觉预分析记录了Token":(
-            metrics["vision_analysis_total_tokens"] is not None
-            and metrics["vision_analysis_total_tokens"]>0  
+        "视觉预分析有耗时": (
+            metrics["vision_analysis_latency_ms"] > 0
         ),
+        "视觉预分析记录了Token": (
+            metrics["vision_analysis_total_tokens"] is not None
+            and metrics["vision_analysis_total_tokens"] > 0
+        ),
+        "视觉预分析执行成功": (metrics["vision_analysis_succeeded"] is True),
+        "正常链路没有触发降级": (metrics["vision_fallback_used"] is False),
+        "正常链路没有预分析错误": (metrics["vision_analysis_error"] is None),
         "至少返回1张知识库图片": (len(returned_image_ids) >= 1),
         "知识库图片不超过3张": (len(returned_image_ids) <= 3),
         "返回图片均来自候选资料": (returned_image_ids <= allowed_image_ids),

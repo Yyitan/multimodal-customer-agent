@@ -4,12 +4,16 @@ from time import perf_counter
 from app.config import Settings, get_settings
 from app.context_builder import build_context_package
 from app.hybrid_retriever import hybrid_search
-from app.llm_client import LLMResult, generate_answer
+from app.llm_client import LLMClientError, LLMResult, generate_answer
 from app.prompt_builder import build_prompt_package
 from app.vision_analyzer import (
     analyze_images_for_retrieval,
     build_multimodal_retrieval_query,
 )
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 # 指标打包：一次性组装成固定结构的metric字典。
 def build_metrics(
@@ -20,32 +24,35 @@ def build_metrics(
     context_record_count: int,
     context_length: int,
     llm_result: LLMResult | None,
-    vision_analysis:dict[str,Any]|None=None,
+    vision_analysis: dict[str, Any] | None = None,
     input_image_count: int = 0,
 ) -> dict[str, Any]:
     """构造一次问答流水线的运行指标。"""
     # 没有图片时，不进行视觉预分析，耗时0.Token为None
     if vision_analysis is None:
-        vision_analysis_latency_ms=0
-        vision_analysis_prompt_tokens=None
-        vision_analysis_completion_tokens=None
-        vision_analysis_total_tokens=None
+        vision_analysis_latency_ms = 0
+        vision_analysis_prompt_tokens = None
+        vision_analysis_completion_tokens = None
+        vision_analysis_total_tokens = None
+        vision_analysis_succeeded = False
+        vision_fallback_used = False
+        vision_analysis_error = None
     # 有图片时，从vision_analysis字典中读取第一次模型调用的数据
     else:
-        vision_analysis_latency_ms=vision_analysis.get(
+        vision_analysis_latency_ms = vision_analysis.get(
             "latency_ms",
             0,
         )
-        vision_analysis_prompt_tokens=vision_analysis.get(
-            "prompt_tokens"
-        )
-        vision_analysis_completion_tokens=vision_analysis.get(
-            "completion_tokens"
-        )
-        vision_analysis_total_tokens=vision_analysis.get(
-            "total_tokens"
-        )
-        
+        vision_analysis_prompt_tokens = vision_analysis.get("prompt_tokens")
+        vision_analysis_completion_tokens = vision_analysis.get("completion_tokens")
+        vision_analysis_total_tokens = vision_analysis.get("total_tokens")
+        # 图片预分析成功否
+        vision_analysis_succeeded = bool(vision_analysis.get("succeeded", True))
+        # 是否退回纯文字检索
+        vision_fallback_used = not vision_analysis_succeeded
+        # 失败原因
+        vision_analysis_error = vision_analysis.get("error")
+
     return {
         "llm_called": llm_result is not None,
         "provider": (
@@ -69,11 +76,14 @@ def build_metrics(
         ),
         "input_image_count": input_image_count,
         "vision_used": (input_image_count > 0 and llm_result is not None),
-        "vision_analysis_called":vision_analysis is not None,
-        "vision_analysis_latency_ms":vision_analysis_latency_ms,
-        "vision_analysis_prompt_tokens":vision_analysis_prompt_tokens,
-        "vision_analysis_completion_tokens":vision_analysis_completion_tokens,
-        "vision_analysis_total_tokens":vision_analysis_total_tokens,
+        "vision_analysis_called": vision_analysis is not None,
+        "vision_analysis_latency_ms": vision_analysis_latency_ms,
+        "vision_analysis_prompt_tokens": vision_analysis_prompt_tokens,
+        "vision_analysis_completion_tokens": vision_analysis_completion_tokens,
+        "vision_analysis_total_tokens": vision_analysis_total_tokens,
+        "vision_analysis_succeeded": vision_analysis_succeeded,
+        "vision_fallback_used": vision_fallback_used,
+        "vision_analysis_error": vision_analysis_error,
     }
 
 
@@ -92,29 +102,54 @@ def answer_question(
 
     # 如果调用方没有传图片，统一转成空列表。
     current_images = images or []
-    
+
     # 整条业务链从这里开始计时。
     # 视觉预分析、检索、上下文构造、大模型回答都会计入总耗时。
-    pipeline_started_at=perf_counter()
-    
+    pipeline_started_at = perf_counter()
     # 默认使用原始问题进行检索。
-    retrieval_query=question
-    
+    retrieval_query = question
     # 保存视觉预分析结果，便于后面记录指标或调试。
-    vision_analysis=None
-    
+    vision_analysis = None
     # 如果用户上传了图片，先调用视觉模型提取检索线索
     if current_images:
-        vision_analysis=analyze_images_for_retrieval(
-            question=question,
-            images=current_images,
-            settings=current_settings,
-        )
-        
-        retrieval_query=build_multimodal_retrieval_query(
-            question=question,
-            analysis=vision_analysis,
-        )
+        vision_analysis_started_at = perf_counter()
+        try:
+            # 尝试视觉预分析
+            vision_analysis = analyze_images_for_retrieval(
+                question=question,
+                images=current_images,
+                settings=current_settings,
+            )
+
+        # 只捕获模型调用类错误
+        # 失败后不构成增强问题，保持原问题
+        except LLMClientError as error:
+            vision_analysis = {
+                "product_hint": "",
+                "visual_keywords": [],
+                "visual_description": "",
+                "latency_ms": round(
+                    (perf_counter() - vision_analysis_started_at) * 1000
+                ),
+                "prompt_tokens": None,
+                "completion_tokens": None,
+                "total_tokens": None,
+                "succeeded": False,
+                "error": str(error),
+            }
+
+            logger.warning(
+                "vision_analysis_failed " "fallback_to_text_retrieval error=%s",
+                error,
+            )
+        # 没有异常时才生成增强检索问题
+        else:
+            vision_analysis["succeeded"] = True
+            vision_analysis["error"] = None
+            retrieval_query = build_multimodal_retrieval_query(
+                question=question,
+                analysis=vision_analysis,
+            )
 
     # 检索模块单独的计时起点专门用来只测 hybrid_search这一步花多久。
     retrieval_started_at = perf_counter()
