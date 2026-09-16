@@ -37,7 +37,7 @@ def load_image_as_data_url(image_path: Path) -> str:
 def main() -> None:
     if not IMAGE_PATH.exists():
         raise SystemExit(f"找不到测试图片：{IMAGE_PATH}")
-    
+
     image_data_url = load_image_as_data_url(IMAGE_PATH)
 
     print("测试图片：", IMAGE_PATH.name)
@@ -49,11 +49,8 @@ def main() -> None:
     #     "请看我上传的这张照片。我想给这台健身追踪器更换表带，"
     #     "知识库里有其他尺寸可选吗？平时佩戴需要注意什么？"
     # )
-    
-    question = (
-        "请看我上传的这张照片。"
-        "我想给这个设备更换配件，应该怎么操作？"
-    )
+
+    question = "请看我上传的这张照片。" "我想给这个设备更换配件，应该怎么操作？"
 
     print("\n正在调用完整业务链（检索+视觉模型）......")
 
@@ -67,40 +64,33 @@ def main() -> None:
 
     print("\n====返回的知识库图片====")
     print(result["image_ids"])
-    
+
     from collections import Counter
-    
-    product_distribution=Counter(
-        record["product"]
-        for record in result["references"]
-    )
-    
+
+    product_distribution = Counter(record["product"] for record in result["references"])
+
     print("\n====参考资料产品分布====")
     print(product_distribution)
 
     metrics = result["metrics"]
-    
-    returned_image_ids=set(result["image_ids"])
-    
+
+    returned_image_ids = set(result["image_ids"])
+
     # 集合推导式：把所有参考资料里出现过的图片ID全部拿出来，集合自动去重
-    allowed_image_ids={
-        image_id
-        for record in result["references"]
-        for image_id in record["image_ids"]
+    allowed_image_ids = {
+        image_id for record in result["references"] for image_id in record["image_ids"]
     }
     # 列表推导式：循环每一个候选图片 ID，检查这个 ID 有没有直接出现在给用户看的 answer 文本中，存在就放进泄露列表
-    leaked_image_ids=[
-        image_id
-        for image_id in allowed_image_ids
-        if image_id in result["answer"]
+    leaked_image_ids = [
+        image_id for image_id in allowed_image_ids if image_id in result["answer"]
     ]
     # re.findall(pattern, text):文本`text`中，找出所有匹配正则规则的子串，全部放到列表返回。
-    leaked_reference_markers=re.findall(
+    leaked_reference_markers = re.findall(
         # 最前面的 r""：原始字符串;(?:参考)?:?: 代表非捕获分组,只用来分组匹配，不单独把 “参考” 提取出来;资料：固定匹配中文 “资料” 这两个字;\s*:`\s` = 任意空白字符（空格）,`*` = 0 次或多次;`\d+``\d` = 数字 0~9
         r"(?:参考)?资料\s*\d+",
         result["answer"],
     )
-    
+
     print("\n====运行指标====")
     for name, value in metrics.items():
         print(f"{name}:{value}")
@@ -112,27 +102,19 @@ def main() -> None:
         "路由到视觉模型": metrics["model"] == "qwen3-vl-flash",
         "供应商正确": metrics["provider"] == "openai_compatible",
         "正常结束(stop)": metrics["finish_reason"] == "stop",
-        "确实收到1张用户图片":(
-            metrics["input_image_count"]==1
+        "确实收到1张用户图片": (metrics["input_image_count"] == 1),
+        "确实启用了视觉模型": (metrics["vision_used"] is True),
+        "视觉预分析已调用": (metrics["vision_analysis_called"] is True),
+        "视觉预分析有耗时":metrics["vision_analysis_called"] is True,
+        "视觉预分析记录了Token":(
+            metrics["vision_analysis_total_tokens"] is not None
+            and metrics["vision_analysis_total_tokens"]>0  
         ),
-        "确实启用了视觉模型":(
-            metrics["vision_used"] is True
-        ),
-        "至少返回1张知识库图片":(
-            len(returned_image_ids)>=1
-        ),
-        "知识库图片不超过3张":(
-            len(returned_image_ids)<=3
-        ),
-        "返回图片均来自候选资料":(
-            returned_image_ids<=allowed_image_ids
-        ),
-        "回答正文没有泄露图片ID":(
-            not leaked_image_ids
-        ),
-        "回答正文没有泄露资料编号":(
-            not leaked_reference_markers
-        ),
+        "至少返回1张知识库图片": (len(returned_image_ids) >= 1),
+        "知识库图片不超过3张": (len(returned_image_ids) <= 3),
+        "返回图片均来自候选资料": (returned_image_ids <= allowed_image_ids),
+        "回答正文没有泄露图片ID": (not leaked_image_ids),
+        "回答正文没有泄露资料编号": (not leaked_reference_markers),
     }
 
     all_passed = True

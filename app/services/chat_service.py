@@ -20,9 +20,32 @@ def build_metrics(
     context_record_count: int,
     context_length: int,
     llm_result: LLMResult | None,
+    vision_analysis:dict[str,Any]|None=None,
     input_image_count: int = 0,
 ) -> dict[str, Any]:
     """构造一次问答流水线的运行指标。"""
+    # 没有图片时，不进行视觉预分析，耗时0.Token为None
+    if vision_analysis is None:
+        vision_analysis_latency_ms=0
+        vision_analysis_prompt_tokens=None
+        vision_analysis_completion_tokens=None
+        vision_analysis_total_tokens=None
+    # 有图片时，从vision_analysis字典中读取第一次模型调用的数据
+    else:
+        vision_analysis_latency_ms=vision_analysis.get(
+            "latency_ms",
+            0,
+        )
+        vision_analysis_prompt_tokens=vision_analysis.get(
+            "prompt_tokens"
+        )
+        vision_analysis_completion_tokens=vision_analysis.get(
+            "completion_tokens"
+        )
+        vision_analysis_total_tokens=vision_analysis.get(
+            "total_tokens"
+        )
+        
     return {
         "llm_called": llm_result is not None,
         "provider": (
@@ -46,6 +69,11 @@ def build_metrics(
         ),
         "input_image_count": input_image_count,
         "vision_used": (input_image_count > 0 and llm_result is not None),
+        "vision_analysis_called":vision_analysis is not None,
+        "vision_analysis_latency_ms":vision_analysis_latency_ms,
+        "vision_analysis_prompt_tokens":vision_analysis_prompt_tokens,
+        "vision_analysis_completion_tokens":vision_analysis_completion_tokens,
+        "vision_analysis_total_tokens":vision_analysis_total_tokens,
     }
 
 
@@ -130,6 +158,7 @@ def answer_question(
                 context_length=0,
                 # 这里 llm_result=None 表示根本没有调用模型。
                 llm_result=None,
+                vision_analysis=vision_analysis,
                 input_image_count=len(current_images),
             ),
         }
@@ -160,6 +189,7 @@ def answer_question(
                 context_record_count=0,
                 context_length=0,
                 llm_result=None,
+                vision_analysis=vision_analysis,
                 input_image_count=len(current_images),
             ),
         }
@@ -196,6 +226,7 @@ def answer_question(
             context_record_count=context_package["record_count"],
             context_length=context_package["context_length"],
             llm_result=llm_result,
+            vision_analysis=vision_analysis,
             input_image_count=len(current_images),
         ),
     }

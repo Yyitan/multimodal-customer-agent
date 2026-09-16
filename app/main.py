@@ -99,6 +99,11 @@ class ChatMetrics(BaseModel):
     completion_tokens: int | None
     total_tokens: int | None
     llm_latency_ms: int
+    vision_analysis_called:bool
+    vision_analysis_latency_ms:int
+    vision_analysis_prompt_tokens:int|None
+    vision_analysis_completion_tokens:int|None
+    vision_analysis_total_tokens:int|None
     retrieval_latency_ms: int
     total_latency_ms: int
     retrieved_record_count: int
@@ -217,14 +222,17 @@ def chat(
             # 标记字符串`chat_completed`，一眼看出这是一次问答成功。
             "chat_completed session_id=%s"
             "provider=%s model=%s"
-            "retrieval_ms=%s llm_ms=%s total_ms=%s"
+            "vision_analysis_ms=%s retrieval_ms=%s"
+            "llm_ms=%s total_ms=%s"
             "prompt_tokens=%s completion_tokens=%s"
             "total_tokens=%s references=%s"
-            "finish_reason=%s selected_images=%s "
+            "finish_reason=%s selected_images=%s"
         ),
+        
         session_id,
         metrics["provider"],
         metrics["model"],
+        metrics["vision_analysis_latency_ms"],
         metrics["retrieval_latency_ms"],
         metrics["llm_latency_ms"],
         metrics["total_latency_ms"],
