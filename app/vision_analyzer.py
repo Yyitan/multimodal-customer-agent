@@ -25,6 +25,8 @@ VISION_ANALYSIS_SYSTEM_PROMPT = """你是一个用于知识库检索的图片分
 7. answer 字符串内部必须包含一个合法的 JSON 对象。
 8. image_ids 必须返回空数组。
 9. 不要使用 Markdown 代码块。
+10. product_confidence必须是0到1之间的数字，表示图片与product_hint匹配的把握程度。
+11. 如果product_hint为空字符串，product_confidence必须为0。
 """
 
 VISION_ANALYSIS_USER_PROMPT = """请分析用户上传的图片，为后续知识库检索提取线索。
@@ -47,11 +49,13 @@ VISION_ANALYSIS_USER_PROMPT = """请分析用户上传的图片，为后续知�
 8. 外层 JSON 的 answer 必须是字符串。
 9. answer 字符串里面再放一个 JSON 对象。
 10. image_ids 必须是空数组。
+11. product_confidence必须是0到1之间的数字。
+12. 如果product_hint为空字符串，product_confidence必须返回0。
 
 外层 JSON 必须严格使用下面格式：
 
 {{
-  "answer": "{{\\\"product_hint\\\":\\\"健身追踪器\\\",\\\"visual_keywords\\\":[\\\"智能手表\\\",\\\"硅胶表带\\\"],\\\"visual_description\\\":\\\"图片中是一块带有硅胶表带的智能手表。\\\"}}",
+  "answer": "{{\\\"product_hint\\\":\\\"健身追踪器\\\",\\\"product_confidence\\\":0.95,\\\"visual_keywords\\\":[\\\"智能手表\\\",\\\"硅胶表带\\\"],\\\"visual_description\\\":\\\"图片中是一块带有硅胶表带的智能手表。\\\"}}",
   "image_ids": []
 }}
 
@@ -59,7 +63,23 @@ VISION_ANALYSIS_USER_PROMPT = """请分析用户上传的图片，为后续知�
 只返回合法 JSON，不要添加其他文字。
 """
 
-
+def normalize_product_confidence(
+    value:Any,
+    product_hint:str,
+)->float:
+    """把模型返回的产品置信度规范化到0到1之间。"""
+    # 没有有效产品名称时，置信度必须为0
+    if not product_hint:
+        return 0.0
+    # python中bool是int的子类，所以需要单独排除
+    if isinstance(value,bool):
+        return 0.0
+    if not isinstance(value,(int,float)):
+        return 0.0
+    return max(
+        0.0,
+        min(float(value),1.0),
+    )
 def analyze_images_for_retrieval(
     question: str,
     images: list[str],
@@ -70,6 +90,7 @@ def analyze_images_for_retrieval(
     if not images:
         return {
             "product_hint": "",
+            "product_confidence":0.0,
             "visual_keywords": [],
             "visual_description": "",
         }
@@ -107,6 +128,11 @@ def analyze_images_for_retrieval(
         "",
     )
 
+    product_confidence=analysis.get(
+        "product_confidence",
+        0.0,
+    )
+
     visual_keywords = analysis.get(
         "visual_keywords",
         [],
@@ -122,6 +148,11 @@ def analyze_images_for_retrieval(
     product_hint = product_hint.strip()
     if product_hint not in KNOWN_PRODUCTS:
         product_hint = ""
+
+    product_confidence=normalize_product_confidence(
+        value=product_confidence,
+        product_hint=product_hint,
+    )
 
     if not isinstance(visual_keywords, list):
         visual_keywords = []
@@ -139,6 +170,7 @@ def analyze_images_for_retrieval(
 
     return {
         "product_hint": product_hint,
+        "product_confidence":product_confidence,
         "visual_keywords": visual_keywords,
         "visual_description": visual_description.strip(),
         "latency_ms": result.latency_ms,
