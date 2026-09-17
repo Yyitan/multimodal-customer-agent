@@ -80,6 +80,45 @@ def normalize_product_confidence(
         0.0,
         min(float(value),1.0),
     )
+
+# 定义硬过滤阈值
+PRODUCT_HARD_FILTER_THRESHOLD=0.8
+# 定义软增强阈值
+PRODUCT_SOFT_BOOST_THRESHOLD=0.4
+
+def choose_product_retrieval_strategy(
+    analysis:dict[str,Any],
+)->dict[str,Any]:
+    """根据产品置信度选择检索策略。"""
+
+    product_hint=analysis.get("product_hint","")
+    confidence=normalize_product_confidence(
+        value=analysis.get("product_confidence",0.0),
+        product_hint=product_hint,
+    )
+
+    # 模型很确定这是什么产品 → 检索时强制只检索该产品的知识库片段，过滤其他产品的资料，精准缩小检索范围。
+    if confidence>=PRODUCT_HARD_FILTER_THRESHOLD:
+        return {
+            "strategy":"hard_filter",
+            "include_product_hint":True,
+            "preferred_product":None,
+        }
+
+    # 模型有点把握，但不够确定 → 不强制过滤产品，但把这个产品作为偏好，检索时给该产品的文档加分（boost 提升排序权重），不直接砍掉其他产品。
+    if confidence>=PRODUCT_SOFT_BOOST_THRESHOLD:
+        return {
+            "strategy":"soft_boost",
+            "include_product_hint":False,
+            "preferred_product":product_hint,
+        }
+
+    # 识别结果可信度太低 → 完全抛弃图片识别出来的产品 hint，，不使用，直接用用户原始问题检索（降级）。
+    return {
+        "strategy": "ignored",
+        "include_product_hint": False,
+        "preferred_product": None,
+    }
 def analyze_images_for_retrieval(
     question: str,
     images: list[str],
@@ -183,6 +222,7 @@ def analyze_images_for_retrieval(
 def build_multimodal_retrieval_query(
     question: str,
     analysis: dict[str, Any],
+    include_product_hint:bool=True,
 ) -> str:
     """把视觉分析结果合并到原始问题中，形成增强检索问题。"""
 
@@ -195,7 +235,8 @@ def build_multimodal_retrieval_query(
         "",
     )
 
-    if product_hint:
+    # 中等和低置信度时，增强问题中不会出现产品名称，因此不会意外触发硬过滤。
+    if product_hint and include_product_hint:
         parts.append(f"图片识别到的产品线索：{product_hint}")
 
     visual_keywords = analysis.get(

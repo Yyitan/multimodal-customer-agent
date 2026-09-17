@@ -9,6 +9,7 @@ from app.prompt_builder import build_prompt_package
 from app.vision_analyzer import (
     analyze_images_for_retrieval,
     build_multimodal_retrieval_query,
+    choose_product_retrieval_strategy,
 )
 import logging
 
@@ -28,7 +29,7 @@ def build_metrics(
     input_image_count: int = 0,
 ) -> dict[str, Any]:
     """构造一次问答流水线的运行指标。"""
-    # 没有图片时，不进行视觉预分析，耗时0.Token为None
+    # 没有图片时，不进行视觉预分析，耗时0.Token为None;产品提示、置信度都为空
     if vision_analysis is None:
         vision_analysis_latency_ms = 0
         vision_analysis_prompt_tokens = None
@@ -37,6 +38,9 @@ def build_metrics(
         vision_analysis_succeeded = False
         vision_fallback_used = False
         vision_analysis_error = None
+        vision_product_hint=None
+        vision_product_confidence = None
+        vision_product_strategy = "none"
     # 有图片时，从vision_analysis字典中读取第一次模型调用的数据
     else:
         vision_analysis_latency_ms = vision_analysis.get(
@@ -52,6 +56,22 @@ def build_metrics(
         vision_fallback_used = not vision_analysis_succeeded
         # 失败原因
         vision_analysis_error = vision_analysis.get("error")
+        vision_product_hint = (
+            vision_analysis.get("product_hint")
+            or None
+        )
+        vision_product_confidence = (
+            vision_analysis.get(
+            "product_confidence",
+                0.0,
+            )
+        )
+        vision_product_strategy = (
+            vision_analysis.get(
+            "retrieval_strategy",
+            "none",
+            )
+        )
 
     return {
         "llm_called": llm_result is not None,
@@ -84,6 +104,9 @@ def build_metrics(
         "vision_analysis_succeeded": vision_analysis_succeeded,
         "vision_fallback_used": vision_fallback_used,
         "vision_analysis_error": vision_analysis_error,
+        "vision_product_hint": vision_product_hint,
+        "vision_product_confidence": vision_product_confidence,
+        "vision_product_strategy": vision_product_strategy,
     }
 
 
@@ -110,6 +133,8 @@ def answer_question(
     retrieval_query = question
     # 保存视觉预分析结果，便于后面记录指标或调试。
     vision_analysis = None
+
+    preferred_product = None
     # 如果用户上传了图片，先调用视觉模型提取检索线索
     if current_images:
         vision_analysis_started_at = perf_counter()
@@ -126,6 +151,8 @@ def answer_question(
         except LLMClientError as error:
             vision_analysis = {
                 "product_hint": "",
+                "product_confidence": 0.0,
+                "retrieval_strategy": "fallback",  # 新增策略标记
                 "visual_keywords": [],
                 "visual_description": "",
                 "latency_ms": round(
@@ -146,10 +173,19 @@ def answer_question(
         else:
             vision_analysis["succeeded"] = True
             vision_analysis["error"] = None
+            # 用视觉分析结果，选择产品检索策略
+            product_strategy = choose_product_retrieval_strategy(vision_analysis)
+            # 把本次策略存入vision_analysis字典，方便日志/评测查看
+            vision_analysis["retrieval_strategy"] = product_strategy["strategy"]
+            # 构造多模态检索query，根据策略决定是否把产品hint加入检索词
             retrieval_query = build_multimodal_retrieval_query(
                 question=question,
                 analysis=vision_analysis,
+                include_product_hint=product_strategy["include_product_hint"],
             )
+
+            # 取出偏好产品，传给hybrid_search做软加分（soft_boost场景生效）
+            preferred_product = product_strategy["preferred_product"]
 
     # 检索模块单独的计时起点专门用来只测 hybrid_search这一步花多久。
     retrieval_started_at = perf_counter()
@@ -162,6 +198,7 @@ def answer_question(
         seed_top_k=current_settings.seed_top_k,
         window_size=current_settings.neighbor_window_size,
         max_results=current_settings.max_retrieval_results,
+        preferred_product=preferred_product,
     )
     # 输出：排序完成的知识库切片列表`retrieved_records`。
 

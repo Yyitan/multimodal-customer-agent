@@ -109,6 +109,9 @@ class ChatMetrics(BaseModel):
     selected_image_count: int
     input_image_count: int
     vision_used: bool
+    vision_product_hint: str | None
+    vision_product_confidence: float | None
+    vision_product_strategy: str
 
 
 # 规定真正业务结果的格式

@@ -99,10 +99,7 @@ def main() -> None:
     leaked_image_recommendation_sentences = [
         sentence
         for sentence in answer_sentences
-        if (
-            "图片" in sentence
-            or "示意图" in sentence
-        )
+        if ("图片" in sentence or "示意图" in sentence)
         and any(
             cue in sentence
             for cue in (
@@ -141,8 +138,20 @@ def main() -> None:
         "回答正文没有泄露图片ID": (not leaked_image_ids),
         "回答正文没有泄露资料编号": (not leaked_reference_markers),
         "回答正文没有重复推荐图片": (not leaked_image_recommendation_sentences),
+        "记录了视觉产品名称": (metrics["vision_product_hint"] == "健身追踪器"),
+        "记录了视觉产品置信度": (
+            metrics["vision_product_confidence"] is not None
+            and 0.0 <= metrics["vision_product_confidence"] <= 1.0
+        ),
+        "记录了产品检索策略": (
+            metrics["vision_product_strategy"]
+            in {
+                "hard_filter",
+                "soft_boost",
+                "ignored",
+            }
+        ),
     }
-
     all_passed = True
     for name, passed in checks.items():
         print(f"{'通过' if passed else '失败'}|{name}")
