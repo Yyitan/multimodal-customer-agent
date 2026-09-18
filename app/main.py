@@ -7,7 +7,12 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 # 用来创建Web接口服务
-from fastapi import FastAPI, HTTPException
+from fastapi import (
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+)
 
 # 用来规定接口JSON的格式，并自动检查用户传的数据是否合格
 # `field_validator`：Pydantic 的字段校验装饰器，
@@ -148,6 +153,37 @@ class ChatResponse(BaseModel):
 
 settings = get_settings()
 
+def verify_api_token(
+    authorization:str|None=Header(default=None),
+)->None:
+    """根据配置校验请求是否携带正确的 Bearer Token。"""
+    # 如果配置 `auth_enabled=false`（本地开发），鉴权直接关闭，不做任何校验，直接放行。
+    if not settings.auth_enabled:
+        return
+
+    configured_token=(
+        settings.api_token.get_secret_value()
+        if settings.api_token is not None
+        else ""
+    )
+    # 鉴权开关打开，但服务端没配置 Token，返回 503
+    if not configured_token:
+        raise HTTPException(
+            status_code=503,
+            detail="服务器未配置 API Token。"
+        )
+
+    expected_authorization=f"Bearer {configured_token}"
+    # 请求没有携带正确的 Authorization，返回 401。
+    if authorization!=expected_authorization:
+        raise HTTPException(
+            status_code=401,
+            detail="缺少或错误的API Token。",
+            headers={
+                "WWW-Authenticate":"Bearer",
+            },
+        )
+# 只有完全匹配 Bearer Token 才允许进入业务函数。
 conversation_store=ConversationStore(
     max_turns=settings.conversation_max_turns,
     max_sessions=settings.conversation_max_sessions,
@@ -191,7 +227,10 @@ def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 # 新增接口：删除会话（清空某一个用户对话记忆）
-@app.delete("/sessions/{session_id}")
+@app.delete(
+    "/sessions/{session_id}",
+    dependencies=[Depends(verify_api_token)],
+)
 def clear_session(session_id:str)->dict[str,str|bool]:
     cleared=conversation_store.clear(session_id)
 
@@ -201,7 +240,11 @@ def clear_session(session_id:str)->dict[str,str|bool]:
     }
 
 # 当外部程序向 /chat 发送一个 POST 请求时，交给下面的 chat 函数处理；并且返回结果必须符合 ChatResponse 的格式
-@app.post("/chat", response_model=ChatResponse)
+@app.post(
+    "/chat",
+    response_model=ChatResponse,
+    dependencies=[Depends(verify_api_token)],
+)
 # 表示 FastAPI 会读取用户发来的 JSON，并根据之前写的 ChatRequest 规则自动转换、检查，然后传给 request
 def chat(
     request: ChatRequest,
