@@ -141,6 +141,20 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # 单个会话最多保存多少轮问答历史
+    conversation_max_turns:int=Field(
+        default=6,
+        ge=1,
+        le=20,
+    )
+
+    # 全局最多同时保存多少个独立session会话
+    conversation_max_sessions:int=Field(
+        default=1000,
+        ge=1,
+        le=10000,
+    )
+
 # 缓存装饰器 
 # - 第一次调用`get_settings()`，实例化`Settings()`，读取`.env`和环境变量，生成配置对象。
 # - 后续所有地方再次调用`get_settings()`，**直接返回缓存好的对象，不会重复读取解析.env 文件**。

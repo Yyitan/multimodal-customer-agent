@@ -1,4 +1,8 @@
 from typing import Any
+from app.conversation_store import (
+    ConversationTurn,
+    format_conversation_history,
+)
 
 SYSTEM_PROMPT = """你是一个专业、谨慎的多模态产品客服助手。
 
@@ -20,17 +24,32 @@ SYSTEM_PROMPT = """你是一个专业、谨慎的多模态产品客服助手。
 14. 图片只能用于提取可见事实，不能替代知识库中的产品说明。
 """
 
-def build_user_prompt(question:str,context:str,image_ids:list[str],max_answer_images:int,)->str:
+
+def build_user_prompt(
+    question: str,
+    context: str,
+    image_ids: list[str],
+    max_answer_images: int,
+    conversation_history: list[ConversationTurn] | None = None,
+) -> str:
     """构造发送给大模型的用户信息"""
     # 判断图片 ID 列表是否非空：
     # 有图片：用逗号把多个图片 ID 拼接成字符串，例如`img_001, img_002`
     if image_ids:
-        image_text=",".join(image_ids)
+        image_text = ",".join(image_ids)
     # 没有图片：赋值字符串`"无"`
     else:
-        image_text="无"
-        
+        image_text = "无"
+
+    # format_conversation_history把[{'question':'xxx','answer':'xxx'},...] 转成可读字符串
+    history_text = format_conversation_history(conversation_history or [])
+    history_text = history_text or "无"
     return f"""请根据下面的知识库参考资料回答用户问题。
+
+最近对话历史：
+{history_text}
+注意：对话历史只用于理解用户指代和上下文，
+产品事实和操作步骤仍然必须来自知识库。
 
 用户问题：
 {question}
@@ -67,46 +86,54 @@ def build_user_prompt(question:str,context:str,image_ids:list[str],max_answer_im
     "image_ids":["候选图片ID"]
 }}
 """
+
+
 # f-string 双大括号 `{{ }}`：如果你想让最终文本输出一个普通 `{` 符号，f-string 里面必须写两个 `{{`；同理 `}}` → 输出一个 `}`
 
+
 def build_prompt_package(
-    question:str,
-    context_package:dict[str,Any],
-    user_images:list[str]|None=None,
-    max_answer_images:int=3,
-)->dict[str,Any]:
+    question: str,
+    context_package: dict[str, Any],
+    user_images: list[str] | None = None,
+    max_answer_images: int = 3,
+    conversation_history: list[ConversationTurn] | None = None,
+) -> dict[str, Any]:
     """构造完整的模型输入包。"""
     # 接收用户原始问题 + `context_package`
-    clean_question=question.strip()
-    
+    clean_question = question.strip()
+
     current_user_images = user_images or []
-        
+
     # 处理后问题为空字符串，直接抛出异常，终止程序，不继续往下调用大模型。
     if not clean_question:
         raise ValueError("问题不能为空。")
-    
+
     # 如果经过过滤之后，最终上下文是空字符串（检索结果全部被字符上限截断丢弃），抛出异常。
     if not context_package["context"]:
         raise ValueError("没有可供大模型参考的知识上下文。")
-    
-    user_prompt=build_user_prompt(
+
+    user_prompt = build_user_prompt(
         question=clean_question,
         context=context_package["context"],
         image_ids=context_package["image_ids"],
         max_answer_images=max_answer_images,
+        conversation_history=conversation_history,
     )
     # 组装并返回完整数据包，这个字典就是后续传给大模型调用模块的数据。
     return {
         "system_prompt": SYSTEM_PROMPT,
         "user_prompt": user_prompt,
         "image_ids": context_package["image_ids"],
-        "user_images":current_user_images,
-        "max_answer_images":max_answer_images,
+        "user_images": current_user_images,
+        "max_answer_images": max_answer_images,
         "record_count": context_package["record_count"],
         "context_length": context_package["context_length"],
     }
 
-def mock_generate_answer(prompt_package:dict[str,Any],)->str:
+
+def mock_generate_answer(
+    prompt_package: dict[str, Any],
+) -> str:
     """模拟大模型，暂时只返回收到的资料摘要。"""
     return (
         "这是模拟回答，尚未调用真实大模型。\n"
@@ -117,21 +144,28 @@ def mock_generate_answer(prompt_package:dict[str,Any],)->str:
         f"关联图片："
         f"{', '.join(prompt_package['image_ids'])}"
     )
-    
-    
-if __name__=="__main__":
+
+
+if __name__ == "__main__":
     from app.context_builder import build_context_package
     from app.hybrid_retriever import hybrid_search
-    
+
     # 测试问题 → 混合检索拿切片 → 构建上下文包（清洗、截断、长度控制） → 构建完整 prompt 包。
-    test_question=("电钻电池温度太高时为什么不能马上充电？")
-    
-    retrieved_records=hybrid_search(test_question,)
-    
-    context_package=build_context_package(retrieved_records,)
-    
-    prompt_package=build_prompt_package(question=test_question,context_package=context_package,)
-    
+    test_question = "电钻电池温度太高时为什么不能马上充电？"
+
+    retrieved_records = hybrid_search(
+        test_question,
+    )
+
+    context_package = build_context_package(
+        retrieved_records,
+    )
+
+    prompt_package = build_prompt_package(
+        question=test_question,
+        context_package=context_package,
+    )
+
     print("系统提示词：")
     print(prompt_package["system_prompt"])
 
@@ -146,7 +180,6 @@ if __name__=="__main__":
 
     print("\n上下文字符数：")
     print(prompt_package["context_length"])
-    
+
     print("\n模拟回答：")
     print(mock_generate_answer(prompt_package))
-    

@@ -11,6 +11,10 @@ from app.vision_analyzer import (
     build_multimodal_retrieval_query,
     choose_product_retrieval_strategy,
 )
+from app.conversation_store import (
+    ConversationTurn,
+    format_conversation_history,
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -109,6 +113,20 @@ def build_metrics(
         "vision_product_strategy": vision_product_strategy,
     }
 
+def build_history_aware_retrieval_query(
+    question:str,
+    history:list[ConversationTurn],
+)->str:
+    # 构造感知历史的检索 query
+    history_text=format_conversation_history(history)
+    # 如果没有历史 → 直接返回原始 question，不做改动
+    if not history_text:
+        return question
+    # 如果存在历史 → 拼接：历史 + 当前问题，交给向量检索
+    return (
+        f"最近对话历史：\n{history_text}\n"
+        f"当前问题：{question}"
+    )
 
 # 整个项目对外的主入口函数
 # `question`：用户输入的原始问题字符串；`settings`：可选，可以手动传入自定义配置对象；不传就自动调用`get_settings()`读取全局配置
@@ -117,6 +135,7 @@ def answer_question(
     question: str,
     images: list[str] | None = None,
     settings: Settings | None = None,
+    conversation_history:list[ConversationTurn]|None=None
 ) -> dict[str, Any]:
     """Run the complete customer-service pipeline."""
     # - 如果调用方手动传入 settings 对象，就用传入的；
@@ -129,8 +148,12 @@ def answer_question(
     # 整条业务链从这里开始计时。
     # 视觉预分析、检索、上下文构造、大模型回答都会计入总耗时。
     pipeline_started_at = perf_counter()
-    # 默认使用原始问题进行检索。
-    retrieval_query = question
+
+    current_history=conversation_history or []
+    retrieval_query = build_history_aware_retrieval_query(
+        question,
+        current_history,
+    )
     # 保存视觉预分析结果，便于后面记录指标或调试。
     vision_analysis = None
 
@@ -177,11 +200,18 @@ def answer_question(
             product_strategy = choose_product_retrieval_strategy(vision_analysis)
             # 把本次策略存入vision_analysis字典，方便日志/评测查看
             vision_analysis["retrieval_strategy"] = product_strategy["strategy"]
-            # 构造多模态检索query，根据策略决定是否把产品hint加入检索词
-            retrieval_query = build_multimodal_retrieval_query(
+            # 先用图片分析结果，生成multimodal_query（带产品提示的检索文本）
+            multimodal_query=build_multimodal_retrieval_query(
                 question=question,
                 analysis=vision_analysis,
-                include_product_hint=product_strategy["include_product_hint"],
+                include_product_hint=(
+                    product_strategy["include_product_hint"]
+                ),
+            )
+            # 再把对话历史拼进去，得到最终用于向量检索的retrieval_query
+            retrieval_query = build_history_aware_retrieval_query(
+                multimodal_query,
+                current_history,
             )
 
             # 取出偏好产品，传给hybrid_search做软加分（soft_boost场景生效）
@@ -273,6 +303,7 @@ def answer_question(
         context_package=context_package,
         user_images=current_images,
         max_answer_images=current_settings.max_answer_images,
+        conversation_history=current_history,
     )
 
     # 第四步：根据配置选择模型后端。

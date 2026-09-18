@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.config import get_settings
 from app.services.chat_service import answer_question
 from app.llm_client import LLMClientError
+from app.conversation_store import ConversationStore
 
 # 增加结构化日志（区分日志等级、写入文件、记录时间、记录异常堆栈，适合后端服务。）
 import logging
@@ -147,6 +148,11 @@ class ChatResponse(BaseModel):
 
 settings = get_settings()
 
+conversation_store=ConversationStore(
+    max_turns=settings.conversation_max_turns,
+    max_sessions=settings.conversation_max_sessions,
+)
+
 # 全局一次性配置日志系统。
 # 日志等级：`DEBUG`(调试) → `INFO`(正常运行信息) → `WARNING`警告 → `ERROR`错误 → `CRITICAL`严重故障
 logging.basicConfig(
@@ -184,6 +190,15 @@ def health_check() -> dict[str, str]:
 
     return {"status": "ok"}
 
+# 新增接口：删除会话（清空某一个用户对话记忆）
+@app.delete("/sessions/{session_id}")
+def clear_session(session_id:str)->dict[str,str|bool]:
+    cleared=conversation_store.clear(session_id)
+
+    return {
+        "session_id":session_id,
+        "cleared":cleared,
+    }
 
 # 当外部程序向 /chat 发送一个 POST 请求时，交给下面的 chat 函数处理；并且返回结果必须符合 ChatResponse 的格式
 @app.post("/chat", response_model=ChatResponse)
@@ -195,10 +210,15 @@ def chat(
     # 如果用户传了 session_id，就使用用户传的；否则，自动生成一个新的 session_id。
     session_id = request.session_id or f"kf_session_{uuid4().hex[:12]}"
 
+    conversation_history=conversation_store.get_history(
+        session_id
+    )
+
     try:
         service_result = answer_question(
             request.question,
             images=request.images,
+            conversation_history=conversation_history
         )
 
     except LLMClientError as error:
@@ -215,6 +235,12 @@ def chat(
 
         # 503：服务器暂时不可用
         raise HTTPException(status_code=503, detail=str(error)) from error
+
+    conversation_store.append_turn(
+        session_id=session_id,
+        question=request.question,
+        answer=service_result["answer"]
+    )
 
     # 把前面`build_metrics`生成的指标字典拿出来，方便后面读取。
     metrics = service_result["metrics"]
