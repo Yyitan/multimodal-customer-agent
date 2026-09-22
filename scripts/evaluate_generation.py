@@ -41,7 +41,8 @@ def evaluate_case(
     service_result = answer_question(case["question"])
     answer = service_result["answer"]
     # 把返回图片 ID、预期图片 ID 都转成`set集合`，方便做集合差集运算
-    returned_image_ids = set(service_result["image_ids"])
+    returned_image_id_list = service_result["image_ids"]
+    returned_image_ids = set(returned_image_id_list)
     expected_image_ids = set(case["expected_image_ids"])
 
     # 调用关键词检查，拿到没命中的关键词组
@@ -69,6 +70,7 @@ def evaluate_case(
         "missing_keyword_groups":missing_keyword_groups,
         "image_passed":image_passed,
         "missing_image_ids":missing_image_ids,
+        "returned_image_ids":returned_image_id_list,
         "overall_passed":overall_passed,
         "reference_count":len(service_result["references"]),
         "returned_image_count":len(returned_image_ids),
@@ -98,6 +100,7 @@ def main()->None:
             )
         print("\n图片检查:")
         print("通过:",result["image_passed"])
+        print("实际返回图片:", result["returned_image_ids"])
         
         if result["missing_image_ids"]:
             print(
@@ -131,5 +134,3 @@ def main()->None:
 
 if __name__ == "__main__":
     main()
-
-        

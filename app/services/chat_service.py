@@ -271,6 +271,7 @@ def answer_question(
         records=retrieved_records,
         max_context_chars=current_settings.max_context_chars,
         max_text_chars=current_settings.max_text_chars,
+        query=retrieval_query,
     )
 
     # 分支判断：检索有结果，但是全部被上下文字符上限过滤丢弃。

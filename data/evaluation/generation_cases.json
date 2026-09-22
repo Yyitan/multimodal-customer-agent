@@ -1,7 +1,7 @@
 [
   {
     "case_id": "drill_temperature",
-    "question": "电钻电池温度太高时为什么不能马上充电？",
+    "question": "使用 DCB107 或 DCB112 充电器时，电钻电池温度太高为什么不能马上充电？",
     "must_include_any": [
       ["过热", "高温", "温度"],
       ["延迟", "暂停"],

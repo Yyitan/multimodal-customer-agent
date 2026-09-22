@@ -31,6 +31,7 @@ def build_user_prompt(
     image_ids: list[str],
     max_answer_images: int,
     conversation_history: list[ConversationTurn] | None = None,
+    image_groups: list[list[str]] | None = None,
 ) -> str:
     """构造发送给大模型的用户信息"""
     # 判断图片 ID 列表是否非空：
@@ -40,6 +41,18 @@ def build_user_prompt(
     # 没有图片：赋值字符串`"无"`
     else:
         image_text = "无"
+
+    current_image_groups = image_groups or []
+    if current_image_groups:
+        image_group_text = "\n".join(
+            f"{index}. {', '.join(group)}"
+            for index, group in enumerate(
+                current_image_groups,
+                start=1,
+            )
+        )
+    else:
+        image_group_text = "无"
 
     # format_conversation_history把[{'question':'xxx','answer':'xxx'},...] 转成可读字符串
     history_text = format_conversation_history(conversation_history or [])
@@ -57,8 +70,11 @@ def build_user_prompt(
 知识库参考资料：
 {context}
 
-候选图片ID：
+候选图片ID（已按问题相关性和相邻资料组排序）：
 {image_text}
+
+候选图片组（同一行属于同一组连续示意图）：
+{image_group_text}
 
 回答要求：
 - 直接回答用户的问题。
@@ -66,7 +82,8 @@ def build_user_prompt(
 - 如果涉及安全风险，请先给出安全提醒。
 - 如果资料不足，请明确说明，不要猜测。
 - 不要提及“向量”“检索分数”“Prompt”等内部实现。
-- 从候选图片ID中选择最有助于回答问题的图片。
+- 如果回答需要图片，从最相关的候选图片组中选择一张代表图片。
+- 系统会自动补齐该组中的连续示意图，不需要逐张列全。
 - 最多选择 {max_answer_images} 张图片。
 - 不需要图片时返回空数组。
 - 不允许返回候选列表之外的图片ID。
@@ -118,12 +135,14 @@ def build_prompt_package(
         image_ids=context_package["image_ids"],
         max_answer_images=max_answer_images,
         conversation_history=conversation_history,
+        image_groups=context_package.get("image_groups", []),
     )
     # 组装并返回完整数据包，这个字典就是后续传给大模型调用模块的数据。
     return {
         "system_prompt": SYSTEM_PROMPT,
         "user_prompt": user_prompt,
         "image_ids": context_package["image_ids"],
+        "image_groups": context_package.get("image_groups", []),
         "user_images": current_user_images,
         "max_answer_images": max_answer_images,
         "record_count": context_package["record_count"],

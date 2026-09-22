@@ -200,6 +200,7 @@ def parse_structured_output(
     raw_output: str,
     candidate_image_ids: list[str],
     max_images: int,
+    candidate_image_groups: list[list[str]] | None = None,
 ) -> tuple[str, list[str]]:
     """解析并校验模型返回的JSON结果。"""
 
@@ -260,12 +261,31 @@ def parse_structured_output(
         if len(selected_image_ids) >= max_images:
             break
 
+    if selected_image_ids and candidate_image_groups:
+        selected_image_ids = select_ranked_image_group(
+            selected_image_ids=selected_image_ids,
+            candidate_image_groups=candidate_image_groups,
+            max_images=max_images,
+        )
+
     clean_answer = sanitize_answer(
         answer=answer,
         candidate_image_ids=candidate_image_ids,
     )
 
     return clean_answer, selected_image_ids
+
+
+def select_ranked_image_group(
+    selected_image_ids: list[str],
+    candidate_image_groups: list[list[str]],
+    max_images: int,
+) -> list[str]:
+    """模型判断是否展示图片，系统固定选择相关性最高的图片组。"""
+    if not selected_image_ids or not candidate_image_groups:
+        return []
+
+    return candidate_image_groups[0][:max_images]
 
 
 # 对外公开主函数：pipline文件里要调用的入口。
@@ -461,6 +481,10 @@ def generate_answer(
     answer, selected_image_ids = parse_structured_output(
         raw_output=raw_output,
         candidate_image_ids=prompt_package["image_ids"],
+        candidate_image_groups=prompt_package.get(
+            "image_groups",
+            [],
+        ),
         max_images=prompt_package.get(
             "max_answer_images",
             3,
