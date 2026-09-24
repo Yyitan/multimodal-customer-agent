@@ -29,13 +29,17 @@ from app.config import (
     get_settings,
     validate_runtime_settings,
 )
+from app.agent_policy import (
+    classify_request,
+    review_evidence,
+)
 from app.input_security import (
     ImageValidationError,
     RequestBodyLimitMiddleware,
     SESSION_ID_PATTERN,
     validate_image_data_urls,
 )
-from app.services.chat_service import answer_question
+from app.services.chat_service import answer_question, build_metrics
 from app.llm_client import LLMClientError
 from app.conversation_store import ConversationStore
 from app.semantic_retriever import (
@@ -166,6 +170,17 @@ class ChatMetrics(BaseModel):
     vision_product_strategy: str
 
 
+class AgentMetadata(BaseModel):
+    """Agent routing and escalation decision returned to the caller."""
+
+    intent: str
+    action: str
+    confidence: float
+    handoff_required: bool
+    handoff_reason: str | None
+    ticket_id: str | None = None
+
+
 # 规定真正业务结果的格式
 class ChatData(BaseModel):
     """Business data nested inside the API response."""
@@ -181,6 +196,7 @@ class ChatData(BaseModel):
         default_factory=list,
         description="Image related to the answer",
     )
+    agent: AgentMetadata
     metrics: ChatMetrics
 
 
@@ -396,32 +412,53 @@ def chat(
     # 如果用户传了 session_id，就使用用户传的；否则，自动生成一个新的 session_id。
     session_id = request.session_id or f"kf_session_{uuid4().hex[:12]}"
 
-    conversation_history=conversation_store.get_history(
+    conversation_history = conversation_store.get_history(
         session_id
     )
+    agent_decision = classify_request(request.question)
 
-    try:
-        service_result = answer_question(
-            request.question,
-            images=request.images,
-            conversation_history=conversation_history
+    if agent_decision.handoff_required:
+        service_result = {
+            "answer": agent_decision.response_message or "需要人工客服处理。",
+            "references": [],
+            "image_ids": [],
+            "metrics": build_metrics(
+                settings=settings,
+                retrieval_latency_ms=0,
+                total_latency_ms=0,
+                retrieved_record_count=0,
+                context_record_count=0,
+                context_length=0,
+                llm_result=None,
+                input_image_count=len(request.images),
+            ),
+        }
+    else:
+        try:
+            service_result = answer_question(
+                request.question,
+                images=request.images,
+                conversation_history=conversation_history,
+            )
+        except LLMClientError as error:
+            logger.exception(
+                "chat_failed request_id=%s session_id=%s provider=%s model=%s",
+                http_request.state.request_id,
+                session_id,
+                settings.llm_provider,
+                settings.llm_model,
+            )
+            raise HTTPException(status_code=503, detail=str(error)) from error
+
+        agent_decision = review_evidence(
+            agent_decision,
+            service_result,
         )
-
-    except LLMClientError as error:
-        # 记录失败请求
-        # logger.exception()：只能写在 except 块里面，输出一条 ERROR 等级日志；自动把完整异常堆栈（traceback）一并打印出来，看到哪一行代码出错，和你命令行看到的报错堆栈一样。
-        # 如果用logger.error()，不会自动带上堆栈，排查问题很难。
-        logger.exception(
-            # `chat_failed` 标记：这条日志代表一次问答失败，`%s` 是占位符，后面依次填入 `session_id, provider, model`。session_id：会话编号，用来追踪这一次失败请求，后续可以根据 session_id 定位整条链路。
-            "chat_failed request_id=%s session_id=%s provider=%s model=%s",
-            http_request.state.request_id,
-            session_id,
-            settings.llm_provider,
-            settings.llm_model,
-        )
-
-        # 503：服务器暂时不可用
-        raise HTTPException(status_code=503, detail=str(error)) from error
+        if agent_decision.handoff_required:
+            service_result["answer"] = (
+                agent_decision.response_message
+                or service_result["answer"]
+            )
 
     conversation_store.append_turn(
         session_id=session_id,
@@ -475,6 +512,13 @@ def chat(
             timestamp=int(datetime.now(timezone.utc).timestamp()),
             references=references,
             image_ids=service_result["image_ids"],
+            agent=AgentMetadata(
+                intent=agent_decision.intent,
+                action=agent_decision.action,
+                confidence=agent_decision.confidence,
+                handoff_required=agent_decision.handoff_required,
+                handoff_reason=agent_decision.handoff_reason,
+            ),
             metrics=ChatMetrics(
                 # `**` 字典解包，把字典里所有 `key:value`，拆成一个个独立的关键字参数传给类 / 函数。（`*列表`：列表解包 → 拆成位置参数）
                 # **：自动读取字典每一项，key 变成参数名，value 变成参数值，一次性全部传入 `ChatMetrics` 的构造函数。

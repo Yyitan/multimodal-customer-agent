@@ -165,6 +165,14 @@ def main() -> None:
 
         checks["第一次会话请求成功"] = first_response.status_code == 200
         checks["第二次会话请求成功"] = second_response.status_code == 200
+        checks["知识问答返回Agent决策"] = (
+            second_response.json()["data"]["agent"]["intent"]
+            == "knowledge_question"
+            and second_response.json()["data"]["agent"]["action"]
+            == "respond_with_knowledge"
+            and second_response.json()["data"]["agent"]["handoff_required"]
+            is False
+        )
 
         first_history = answer_mock.call_args_list[1].kwargs["conversation_history"]
         second_history = answer_mock.call_args_list[2].kwargs["conversation_history"]
@@ -207,6 +215,21 @@ def main() -> None:
         )
 
     checks["模型异常转换为503"] = error_response.status_code == 503
+
+    with patch("app.main.answer_question") as handoff_answer_mock:
+        handoff_response = client.post(
+            "/chat",
+            json={
+                "question": "我要转人工客服处理退款",
+                "session_id": "handoff-session",
+            },
+        )
+    checks["转人工请求跳过模型调用"] = (
+        handoff_response.status_code == 200
+        and handoff_response.json()["data"]["agent"]["handoff_required"]
+        is True
+        and handoff_answer_mock.call_count == 0
+    )
 
     print("====接口层测试====")
 
