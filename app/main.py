@@ -1,6 +1,7 @@
 """FastAPI entry point for the knowledge-based customer-service agent."""
 
 from contextlib import asynccontextmanager
+from secrets import compare_digest
 
 # 生成返回时间戳
 from datetime import datetime, timezone
@@ -14,6 +15,7 @@ from fastapi import (
     FastAPI,
     Header,
     HTTPException,
+    Path as PathParameter,
 )
 
 # 用来规定接口JSON的格式，并自动检查用户传的数据是否合格
@@ -21,6 +23,12 @@ from fastapi import (
 from pydantic import BaseModel, Field, field_validator
 
 from app.config import get_settings
+from app.input_security import (
+    ImageValidationError,
+    RequestBodyLimitMiddleware,
+    SESSION_ID_PATTERN,
+    validate_image_data_urls,
+)
 from app.services.chat_service import answer_question
 from app.llm_client import LLMClientError
 from app.conversation_store import ConversationStore
@@ -35,6 +43,17 @@ class ChatRequest(BaseModel):
 
     # 字段名:必须字符串 至少一个字符串,不能空传字符串
     question: str = Field(..., min_length=1, description="User question")
+
+    @field_validator("question")
+    @classmethod
+    def validate_question(cls, value: str) -> str:
+        """去除无意义空白并限制问题长度。"""
+        clean_value = value.strip()
+        if not clean_value:
+            raise ValueError("问题不能为空。")
+        if len(clean_value) > get_settings().max_question_chars:
+            raise ValueError("问题长度超过限制。")
+        return clean_value
     # images:字符串列表 ,最多3张,后面再要求列表中每个字符串是Base64图片
     # default_factory=list:每个请求都新建一个空列表.这样不同的用户图片不会意外共用.
     images: list[str] = Field(
@@ -48,33 +67,43 @@ class ChatRequest(BaseModel):
     # 固定写法，Pydantic v2 要求。
     @classmethod
     # 触发时机：前端 POST 请求到达 FastAPI，在代码进入`/chat`接口函数之前自动执行。只要校验抛`ValueError`，FastAPI 直接返回`422 Unprocessable Entity`，后面所有业务代码完全不会跑。
-    def validate(cls, values: list[str]) -> list[str]:
-        """检查用户上传图片是否是允许的Base64 Data URL。"""
-        # Base64 DataURL 格式：图片二进制直接放在 JSON 请求体里面，不需要服务器保存图片文件，接口直接拿到图片内容传给多模态大模型。
-        allowed_prefixes = (
-            "data:image/jpeg;base64",
-            "data:image/jpg;base64",
-            "data:image/png;base64",
-            "data:image/webp;base64",
-        )
-
-        # `values` 就是用户传进来的图片字符串列表，循环遍历每一张图片。
-        for image in values:
-            if not isinstance(image, str):
-                raise ValueError("每张图片必须是字符串。")
-
-            # 判断字符串是否以其中任意一个前缀开头
-            if not image.startswith(allowed_prefixes):
-                raise ValueError("图片必须是JPEG、PNG或WEBP的Base64 Data URL。")
-            # 防止单张图片过大，避免请求体无限膨胀。
-            if len(image) > 8_000_000:
-                raise ValueError("单张图片过大，Base64字符串不能超过8MB。")
-
-        return values
+    def validate_images(cls, values: list[str]) -> list[str]:
+        """校验图片编码、真实格式、大小和像素数量。"""
+        current_settings = get_settings()
+        try:
+            return validate_image_data_urls(
+                values,
+                max_image_bytes=current_settings.max_image_bytes,
+                max_total_bytes=current_settings.max_total_image_bytes,
+                max_image_pixels=current_settings.max_image_pixels,
+            )
+        except ImageValidationError as error:
+            raise ValueError(str(error)) from error
 
     session_id: str | None = Field(default=None, description="Conversation ID")
+
+    @field_validator("session_id")
+    @classmethod
+    def validate_session_id(cls, value: str | None) -> str | None:
+        """限制会话 ID，避免无界数据库键和不可见字符。"""
+        if value is None:
+            return None
+        clean_value = value.strip()
+        if not SESSION_ID_PATTERN.fullmatch(clean_value):
+            raise ValueError(
+                "session_id 必须为 1 到 128 位安全字符。"
+            )
+        return clean_value
     # 是否流式返回,接口先预留
     stream: bool = Field(default=False, description="Whether to stream the response")
+
+    @field_validator("stream")
+    @classmethod
+    def reject_unsupported_streaming(cls, value: bool) -> bool:
+        """当前接口不是流式接口，显式拒绝未实现的行为。"""
+        if value:
+            raise ValueError("当前版本尚不支持流式响应。")
+        return value
 
 
 # 规定每条参考资料的返回格式
@@ -177,7 +206,10 @@ def verify_api_token(
 
     expected_authorization=f"Bearer {configured_token}"
     # 请求没有携带正确的 Authorization，返回 401。
-    if authorization!=expected_authorization:
+    if not authorization or not compare_digest(
+        authorization,
+        expected_authorization,
+    ):
         raise HTTPException(
             status_code=401,
             detail="缺少或错误的API Token。",
@@ -226,6 +258,11 @@ app = FastAPI(
     description=("Multimodal customer-service API " "with hybrid knowledge retrieval"),
     lifespan=lifespan,
 )
+app.add_middleware(
+    RequestBodyLimitMiddleware,
+    max_body_bytes=settings.max_request_bytes,
+    paths={"/chat"},
+)
 
 
 # 当有人用 GET 请求访问 /health 时，执行下一行定义的 health_check 函数
@@ -242,7 +279,14 @@ def health_check() -> dict[str, str]:
     "/sessions/{session_id}",
     dependencies=[Depends(verify_api_token)],
 )
-def clear_session(session_id:str)->dict[str,str|bool]:
+def clear_session(
+    session_id: str = PathParameter(
+        ...,
+        min_length=1,
+        max_length=128,
+        pattern=SESSION_ID_PATTERN.pattern,
+    ),
+) -> dict[str, str | bool]:
     cleared=conversation_store.clear(session_id)
 
     return {

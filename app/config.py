@@ -123,6 +123,33 @@ class Settings(BaseSettings):
         ge=100,
         le=10000,
     )
+
+    # API 输入边界，限制文本和图片资源消耗。
+    max_question_chars: int = Field(
+        default=4000,
+        ge=100,
+        le=20000,
+    )
+    max_image_bytes: int = Field(
+        default=4 * 1024 * 1024,
+        ge=1024,
+        le=20 * 1024 * 1024,
+    )
+    max_total_image_bytes: int = Field(
+        default=10 * 1024 * 1024,
+        ge=1024,
+        le=50 * 1024 * 1024,
+    )
+    max_image_pixels: int = Field(
+        default=20_000_000,
+        ge=1,
+        le=100_000_000,
+    )
+    max_request_bytes: int = Field(
+        default=16 * 1024 * 1024,
+        ge=1024,
+        le=64 * 1024 * 1024,
+    )
     
     # API 接口鉴权开关；后端对外提供接口的时候，开启鉴权，请求头带上 token 访问。本地调试默认关闭。
     auth_enabled:bool=False

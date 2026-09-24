@@ -26,6 +26,9 @@ def load_tests(
     from scripts.test_image_ranking import (
         main as test_image_ranking,
     )
+    from scripts.test_input_security import (
+        main as test_input_security,
+    )
     from scripts.test_product_confidence import (
         main as test_product_confidence,
     )
@@ -43,6 +46,7 @@ def load_tests(
         ("多轮会话测试", test_conversation),
         ("回答清洗测试", test_output_sanitizer),
         ("图片候选排序测试", test_image_ranking),
+        ("输入安全测试", test_input_security),
         ("产品置信度测试", test_product_confidence),
         ("产品策略业务链测试", test_product_strategy_chain),
         ("视觉降级测试", test_vision_fallback),
