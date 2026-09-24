@@ -1,0 +1,20 @@
+services:
+  agent:
+    build:
+      context: .
+    env_file:
+      - .env
+    environment:
+      AGENT_ENVIRONMENT: production
+      AGENT_CONVERSATION_DB_PATH: data/runtime/conversations.db
+      AGENT_PRELOAD_EMBEDDING_MODEL: "true"
+    ports:
+      - "8000:8000"
+    volumes:
+      - agent-data:/app/data/runtime
+      - huggingface-cache:/app/.cache/huggingface
+    restart: unless-stopped
+
+volumes:
+  agent-data:
+  huggingface-cache:
