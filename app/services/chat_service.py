@@ -95,6 +95,15 @@ def build_metrics(
         "context_record_count": context_record_count,
         "context_length": context_length,
         "finish_reason": (llm_result.finish_reason if llm_result is not None else None),
+        "llm_attempt_count": (
+            llm_result.attempt_count if llm_result is not None else 0
+        ),
+        "llm_retry_count": (
+            max(llm_result.attempt_count - 1, 0) if llm_result is not None else 0
+        ),
+        "llm_circuit_state": (
+            llm_result.circuit_state if llm_result is not None else "not_called"
+        ),
         "selected_image_count": (
             len(llm_result.image_ids) if llm_result is not None else 0
         ),

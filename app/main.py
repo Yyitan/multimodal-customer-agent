@@ -614,15 +614,32 @@ def chat(
             metrics_registry.increment(
                 "llm_errors_total",
                 provider=settings.llm_provider,
+                category=error.category,
             )
+            if error.category == "circuit_open":
+                metrics_registry.increment(
+                    "llm_circuit_rejections_total",
+                    provider=settings.llm_provider,
+                )
             logger.exception(
-                "chat_failed request_id=%s session_id=%s provider=%s model=%s",
+                "chat_failed request_id=%s session_id=%s provider=%s model=%s category=%s attempts=%s",
                 http_request.state.request_id,
                 session_id,
                 settings.llm_provider,
                 settings.llm_model,
+                error.category,
+                error.attempt_count,
             )
-            raise HTTPException(status_code=503, detail=str(error)) from error
+            headers = None
+            if error.retry_after_seconds is not None:
+                headers = {
+                    "Retry-After": str(max(1, round(error.retry_after_seconds)))
+                }
+            raise HTTPException(
+                status_code=503,
+                detail=str(error),
+                headers=headers,
+            ) from error
 
         agent_decision = review_evidence(
             agent_decision,
@@ -697,6 +714,21 @@ def chat(
         "agent_llm_duration_seconds",
         metrics["llm_latency_ms"] / 1000,
         provider=metrics["provider"],
+    )
+    llm_retry_count = int(metrics.get("llm_retry_count", 0))
+    llm_circuit_state = str(
+        metrics.get("llm_circuit_state", "unknown")
+    )
+    if llm_retry_count:
+        metrics_registry.increment(
+            "llm_retries_total",
+            amount=llm_retry_count,
+            provider=metrics["provider"],
+        )
+    metrics_registry.increment(
+        "llm_circuit_state_total",
+        provider=metrics["provider"],
+        state=llm_circuit_state,
     )
     if metrics["vision_fallback_used"]:
         metrics_registry.increment("vision_fallback_total")

@@ -71,6 +71,13 @@ class Settings(BaseSettings):
         gt=0,
         le=120,
     )
+
+    # 模型韧性：一次逻辑请求最多重试次数、指数退避和熔断恢复窗口。
+    llm_max_retries: int = Field(default=2, ge=0, le=5)
+    llm_retry_base_seconds: float = Field(default=0.5, ge=0, le=10)
+    llm_retry_max_seconds: float = Field(default=4.0, ge=0, le=30)
+    llm_circuit_failure_threshold: int = Field(default=5, ge=1, le=20)
+    llm_circuit_recovery_seconds: float = Field(default=30.0, gt=0, le=600)
     
     # `disabled`：关闭深度思考智谱。 GLM-4.5 的深度思考（thinking）就是模型内部的推理链，开启会消耗更多 token，推理更慢
     llm_thinking:Literal["enabled","disabled"]|None="disabled"

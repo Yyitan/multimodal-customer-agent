@@ -13,6 +13,11 @@ from openai import (
     RateLimitError,
 )
 from app.config import Settings
+from app.model_resilience import (
+    CircuitOpenError,
+    ResilienceExhaustedError,
+    execute_with_resilience,
+)
 from app.prompt_builder import mock_generate_answer
 
 # 数据类装饰器，用来专门存放数据的类
@@ -24,6 +29,21 @@ from time import perf_counter
 
 class LLMClientError(RuntimeError):
     """调用大模型失败时抛出的统一业务异常。"""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        category: str = "unknown",
+        retryable: bool = False,
+        attempt_count: int = 1,
+        retry_after_seconds: float | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.category = category
+        self.retryable = retryable
+        self.attempt_count = attempt_count
+        self.retry_after_seconds = retry_after_seconds
 
     # **自定义异常类**：继承 Python 内置`RuntimeError`。作用：统一包装所有大模型调用相关错误。
 
@@ -49,6 +69,8 @@ class LLMResult:
     latency_ms: int
     # 记录模型为什么停止生成。（stop：正常完成；length：达到max_tokens，被强制停止）
     finish_reason: str | None
+    attempt_count: int = 1
+    circuit_state: str = "closed"
 
 
 # `@lru_cache(maxsize=4)`：缓存客户端实例（最多只缓存4个客户端实例）。参数：api 密钥、接口地址、超时时间。
@@ -63,8 +85,8 @@ def _create_client(
     client_options: dict[str, Any] = {
         "api_key": api_key,
         "timeout": timeout_seconds,
-        # `ax_retries=2`：SDK 内部自动重试 2 次，网络抖动自动重试
-        "max_retries": 2,
+        # 重试由项目统一管理，避免 SDK 隐式重试导致指标和熔断状态失真。
+        "max_retries": 0,
     }
     # 如果`base_url`不为 None（对接第三方兼容接口，如本地 ollama、阿里云），加入配置；原生 OpenAI 不需要 base_url。
     if base_url:
@@ -288,6 +310,56 @@ def select_ranked_image_group(
     return candidate_image_groups[0][:max_images]
 
 
+def _is_retryable_provider_error(error: Exception) -> bool:
+    if isinstance(
+        error,
+        (APITimeoutError, RateLimitError, APIConnectionError, TimeoutError),
+    ):
+        return True
+    if isinstance(error, APIStatusError):
+        return error.status_code in {408, 409, 425, 429} or error.status_code >= 500
+    return False
+
+
+def _translate_provider_error(
+    error: Exception,
+    attempt_count: int,
+) -> LLMClientError:
+    if isinstance(error, APITimeoutError | TimeoutError):
+        return LLMClientError(
+            "大模型请求超时，请稍后重试。",
+            category="timeout",
+            retryable=True,
+            attempt_count=attempt_count,
+        )
+    if isinstance(error, RateLimitError):
+        return LLMClientError(
+            "大模型接口触发限流，请稍后重试。",
+            category="rate_limit",
+            retryable=True,
+            attempt_count=attempt_count,
+        )
+    if isinstance(error, APIConnectionError):
+        return LLMClientError(
+            "无法连接大模型服务，请检查网络和接口地址。",
+            category="connection",
+            retryable=True,
+            attempt_count=attempt_count,
+        )
+    if isinstance(error, APIStatusError):
+        return LLMClientError(
+            f"大模型服务返回错误，状态码：{error.status_code}",
+            category=f"http_{error.status_code}",
+            retryable=_is_retryable_provider_error(error),
+            attempt_count=attempt_count,
+        )
+    return LLMClientError(
+        "大模型调用失败。",
+        category="unknown",
+        attempt_count=attempt_count,
+    )
+
+
 # 对外公开主函数：pipline文件里要调用的入口。
 def generate_answer(
     prompt_package: dict[str, Any],
@@ -317,6 +389,8 @@ def generate_answer(
             total_tokens=0,
             latency_ms=latency_ms,
             finish_reason="mock",
+            attempt_count=1,
+            circuit_state="disabled",
         )
 
     # 从Prompt数据包中读取用户上传的图片
@@ -351,19 +425,34 @@ def generate_answer(
     total_tokens: int | None = None
     # 提前定义变量，存模型返回的停止原因。
     finish_reason: str | None = None
+    attempt_count = 1
+    circuit_state = "closed"
+    circuit_key = f"{request_provider}:{request_model}:{'vision' if use_vision else 'text'}"
 
     # 拿到客户端，进入try捕获异常块
     try:
         # OpenAI 最新`responses`接口
         if request_provider == "openai":
-            response = client.responses.create(
-                model=request_model,
-                instructions=prompt_package["system_prompt"],
-                input=prompt_package["user_prompt"],
-                max_output_tokens=settings.llm_max_output_tokens,
-                # 不在OpenAI平台存储对话记录（隐私控制）
-                store=False,
+            call_result = execute_with_resilience(
+                lambda: client.responses.create(
+                    model=request_model,
+                    instructions=prompt_package["system_prompt"],
+                    input=prompt_package["user_prompt"],
+                    max_output_tokens=settings.llm_max_output_tokens,
+                    # 不在OpenAI平台存储对话记录（隐私控制）
+                    store=False,
+                ),
+                circuit_key=circuit_key,
+                max_retries=settings.llm_max_retries,
+                retry_base_seconds=settings.llm_retry_base_seconds,
+                retry_max_seconds=settings.llm_retry_max_seconds,
+                circuit_failure_threshold=settings.llm_circuit_failure_threshold,
+                circuit_recovery_seconds=settings.llm_circuit_recovery_seconds,
+                is_retryable=_is_retryable_provider_error,
             )
+            response = call_result.value
+            attempt_count = call_result.attempt_count
+            circuit_state = call_result.circuit_state
             # 直接拿到模型输出文本。
             raw_output = response.output_text
             finish_reason = response.status
@@ -441,7 +530,19 @@ def generate_answer(
                 }
 
             # `**request_options`字典解包，把上面所有参数一次性传给接口。
-            response = client.chat.completions.create(**request_options)
+            call_result = execute_with_resilience(
+                lambda: client.chat.completions.create(**request_options),
+                circuit_key=circuit_key,
+                max_retries=settings.llm_max_retries,
+                retry_base_seconds=settings.llm_retry_base_seconds,
+                retry_max_seconds=settings.llm_retry_max_seconds,
+                circuit_failure_threshold=settings.llm_circuit_failure_threshold,
+                circuit_recovery_seconds=settings.llm_circuit_recovery_seconds,
+                is_retryable=_is_retryable_provider_error,
+            )
+            response = call_result.value
+            attempt_count = call_result.attempt_count
+            circuit_state = call_result.circuit_state
 
             choice = response.choices[0]
             # 模型返回原始字符串
@@ -460,19 +561,23 @@ def generate_answer(
             raise LLMClientError(f"不支持的大模型类型：{request_provider}")
     # 异常捕获块：捕获 OpenAI SDK 抛出的各类原生异常，**翻译成中文友好提示，重新包装为 LLMClientError**。
     # `raise ... from error`：保留原始异常链路，调试时可以看到底层原始报错，同时对外抛出我们自定义业务异常。
-    except APITimeoutError as error:
-        raise LLMClientError("大模型请求超时，请稍后重试。") from error
-
-    except RateLimitError as error:
-        raise LLMClientError("大模型接口触发限流，请稍后重试。") from error
-
-    except APIConnectionError as error:
-        raise LLMClientError("无法连接大模型服务，请检查网络和接口地址。") from error
-
-    except APIStatusError as error:
+    except CircuitOpenError as error:
         raise LLMClientError(
-            f"大模型服务返回错误，状态码：{error.status_code}"
+            "大模型服务连续失败，当前已暂时熔断，请稍后重试。",
+            category="circuit_open",
+            retryable=True,
+            attempt_count=0,
+            retry_after_seconds=error.retry_after_seconds,
         ) from error
+
+    except ResilienceExhaustedError as error:
+        raise _translate_provider_error(
+            error.error,
+            error.attempt_count,
+        ) from error
+
+    except (APITimeoutError, RateLimitError, APIConnectionError, APIStatusError, TimeoutError) as error:
+        raise _translate_provider_error(error, attempt_count) from error
 
     # 结果校验：拿到模型返回内容之后做检查：1、必须是字符串类型。2、去掉首尾空白不能是空，空就抛异常。
     if not isinstance(raw_output, str) or not raw_output.strip():
@@ -503,4 +608,6 @@ def generate_answer(
         total_tokens=total_tokens,
         latency_ms=latency_ms,
         finish_reason=finish_reason,
+        attempt_count=attempt_count,
+        circuit_state=circuit_state,
     )
