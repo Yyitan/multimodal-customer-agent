@@ -47,6 +47,10 @@ def main() -> None:
             },
         )
         checks["没有Token返回401"] = no_token_response.status_code == 401
+        metrics_without_token = client.get("/metrics")
+        checks["metrics接口受Token保护"] = (
+            metrics_without_token.status_code == 401
+        )
         # 用例 3：带 Authorization，但是 token 是错的
         wrong_token_response = client.post(
             "/chat",

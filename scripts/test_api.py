@@ -264,6 +264,15 @@ def main() -> None:
         and feedback_response.json()["rating"] == 5
     )
 
+    metrics_response = client.get("/metrics")
+    checks["指标接口输出Agent和HTTP指标"] = (
+        metrics_response.status_code == 200
+        and "agent_chat_requests_total" in metrics_response.text
+        and "http_requests_total" in metrics_response.text
+        and "support_tickets_created_total" in metrics_response.text
+        and "customer_feedback_total" in metrics_response.text
+    )
+
     print("====接口层测试====")
 
     for name, passed in checks.items():

@@ -53,6 +53,7 @@ from app.request_control import (
     SlidingWindowRateLimiter,
     rate_limit_key,
 )
+from app.observability import MetricsMiddleware, MetricsRegistry
 from app.support_store import SupportStore
 
 # 增加结构化日志（区分日志等级、写入文件、记录时间、记录异常堆栈，适合后端服务。）
@@ -263,6 +264,7 @@ rate_limiter = SlidingWindowRateLimiter(
     max_requests=settings.rate_limit_requests,
     window_seconds=settings.rate_limit_window_seconds,
 )
+metrics_registry = MetricsRegistry()
 
 
 def verify_api_token(
@@ -382,6 +384,7 @@ app.add_middleware(
     paths={"/chat"},
 )
 app.add_middleware(RequestIdMiddleware)
+app.add_middleware(MetricsMiddleware, registry=metrics_registry)
 
 
 # 当有人用 GET 请求访问 /health 时，执行下一行定义的 health_check 函数
@@ -424,6 +427,19 @@ def readiness_check(response: Response) -> dict[str, Any]:
         "index": index_status,
     }
 
+
+@app.get(
+    "/metrics",
+    dependencies=[Depends(verify_api_token)],
+    response_class=Response,
+)
+def metrics() -> Response:
+    """Expose Prometheus text metrics for operations monitoring."""
+    return Response(
+        content=metrics_registry.render(),
+        media_type="text/plain; version=0.0.4",
+    )
+
 # 新增接口：删除会话（清空某一个用户对话记忆）
 @app.delete(
     "/sessions/{session_id}",
@@ -463,6 +479,17 @@ def submit_feedback(
         ),
         rating=payload.rating,
         comment=payload.comment,
+    )
+    metrics_registry.increment(
+        "customer_feedback_total",
+        rating=payload.rating,
+    )
+    logger.info(
+        "feedback_received feedback_id=%s session_id=%s request_id=%s rating=%s",
+        record["feedback_id"],
+        record["session_id"],
+        record["request_id"],
+        record["rating"],
     )
     return FeedbackResponse(**record)
 
@@ -526,6 +553,15 @@ def update_support_ticket(
     )
     if record is None:
         raise HTTPException(status_code=404, detail="工单不存在。")
+    metrics_registry.increment(
+        "support_ticket_status_updates_total",
+        status=payload.status,
+    )
+    logger.info(
+        "ticket_status_changed ticket_id=%s status=%s",
+        ticket_id,
+        payload.status,
+    )
     return SupportTicketResponse(**record)
 
 # 当外部程序向 /chat 发送一个 POST 请求时，交给下面的 chat 函数处理；并且返回结果必须符合 ChatResponse 的格式
@@ -575,6 +611,10 @@ def chat(
                 conversation_history=conversation_history,
             )
         except LLMClientError as error:
+            metrics_registry.increment(
+                "llm_errors_total",
+                provider=settings.llm_provider,
+            )
             logger.exception(
                 "chat_failed request_id=%s session_id=%s provider=%s model=%s",
                 http_request.state.request_id,
@@ -611,6 +651,19 @@ def chat(
             priority=priority,
         )
         ticket_id = str(ticket["ticket_id"])
+        metrics_registry.increment(
+            "support_tickets_created_total",
+            priority=priority,
+            reason=agent_decision.handoff_reason or "human_review_required",
+        )
+        logger.info(
+            "ticket_created ticket_id=%s session_id=%s request_id=%s priority=%s reason=%s",
+            ticket_id,
+            session_id,
+            http_request.state.request_id,
+            priority,
+            agent_decision.handoff_reason,
+        )
         service_result["answer"] = (
             f"{service_result['answer']} "
             f"已创建人工服务工单，编号：{ticket_id}。"
@@ -624,6 +677,29 @@ def chat(
 
     # 把前面`build_metrics`生成的指标字典拿出来，方便后面读取。
     metrics = service_result["metrics"]
+    handoff_label = str(agent_decision.handoff_required).lower()
+    metrics_registry.increment(
+        "agent_chat_requests_total",
+        intent=agent_decision.intent,
+        action=agent_decision.action,
+        handoff=handoff_label,
+    )
+    metrics_registry.observe(
+        "agent_pipeline_duration_seconds",
+        metrics["total_latency_ms"] / 1000,
+        action=agent_decision.action,
+    )
+    metrics_registry.observe(
+        "agent_retrieval_duration_seconds",
+        metrics["retrieval_latency_ms"] / 1000,
+    )
+    metrics_registry.observe(
+        "agent_llm_duration_seconds",
+        metrics["llm_latency_ms"] / 1000,
+        provider=metrics["provider"],
+    )
+    if metrics["vision_fallback_used"]:
+        metrics_registry.increment("vision_fallback_total")
     # `logger.info()`：输出普通成功信息日志
     logger.info(
         (
@@ -634,7 +710,8 @@ def chat(
             "retrieval_ms=%s llm_ms=%s total_ms=%s "
             "prompt_tokens=%s completion_tokens=%s "
             "total_tokens=%s references=%s "
-            "finish_reason=%s selected_images=%s"
+            "finish_reason=%s selected_images=%s "
+            "intent=%s action=%s handoff=%s ticket_id=%s"
         ),
 
         session_id,
@@ -652,6 +729,10 @@ def chat(
         metrics["context_record_count"],
         metrics["finish_reason"],
         metrics["selected_image_count"],
+        agent_decision.intent,
+        agent_decision.action,
+        agent_decision.handoff_required,
+        ticket_id,
     )
     # 示例：2026-09-10 21:00:00,123 | INFO | app.main | chat_completed session_id=ses_001 provider=mock model=mock retrieval_ms=35 llm_ms=12 total_ms=160 prompt_tokens=210 completion_tokens=85 total_tokens=295 references=3 finish_reason=stop selected_images=2
 

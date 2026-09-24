@@ -25,6 +25,7 @@ def load_tests(
     from scripts.test_output_sanitizer import (
         main as test_output_sanitizer,
     )
+    from scripts.test_observability import main as test_observability
     from scripts.test_image_ranking import (
         main as test_image_ranking,
     )
@@ -53,6 +54,7 @@ def load_tests(
         ("API鉴权测试", test_auth),
         ("多轮会话测试", test_conversation),
         ("评测工具测试", test_evaluation),
+        ("可观测性测试", test_observability),
         ("回答清洗测试", test_output_sanitizer),
         ("图片候选排序测试", test_image_ranking),
         ("输入安全测试", test_input_security),
