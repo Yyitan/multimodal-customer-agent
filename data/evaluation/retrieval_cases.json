@@ -25,5 +25,85 @@
     "expected_image_ids": [
       "drill0_06"
     ]
+  },
+  {
+    "case_id": "air_purifier_filter_packaging",
+    "question": "新买的空气净化器滤网外面有塑料包装，不拆会有什么问题？",
+    "expected_product": "空气净化器",
+    "expected_image_ids": [
+      "Manual03_2"
+    ]
+  },
+  {
+    "case_id": "ergonomic_chair_loose_armrest",
+    "question": "人体工学椅使用一段时间后扶手变松了，应该怎么处理？",
+    "expected_product": "人体工学椅",
+    "expected_image_ids": [
+      "Manual02_11"
+    ]
+  },
+  {
+    "case_id": "vr_headset_child_age",
+    "question": "12岁以下的儿童可以使用这款VR头显吗？",
+    "expected_product": "VR头显",
+    "expected_image_ids": [
+      "Manual38_0"
+    ]
+  },
+  {
+    "case_id": "kids_motorcycle_first_charge",
+    "question": "儿童电动摩托车第一次使用前，电池需要充电多长时间？",
+    "expected_product": "儿童电动摩托车",
+    "expected_image_ids": [
+      "Manual26_1"
+    ]
+  },
+  {
+    "case_id": "thermostat_power_off",
+    "question": "拆卸旧的可编程温控器之前，应该在哪里关闭电源？",
+    "expected_product": "可编程温控器",
+    "expected_image_ids": [
+      "Manual36_4"
+    ]
+  },
+  {
+    "case_id": "water_pump_refueling_safety",
+    "question": "给水泵加燃油时有哪些防火和防泄漏注意事项？",
+    "expected_product": "水泵",
+    "expected_image_ids": [
+      "pump_02"
+    ]
+  },
+  {
+    "case_id": "function_keyboard_controls",
+    "question": "功能键盘上的音量滚轮、静音键、Win锁定键和亮度键分别在哪里？",
+    "expected_product": "功能键盘",
+    "expected_image_ids": [
+      "Manual21_6"
+    ]
+  },
+  {
+    "case_id": "steam_cleaner_material_limits",
+    "question": "蒸汽清洁机能不能用于皮革、打蜡地板或丝绒？",
+    "expected_product": "蒸汽清洁机",
+    "expected_image_ids": [
+      "Manual05_1"
+    ]
+  },
+  {
+    "case_id": "air_conditioner_energy_saving",
+    "question": "使用空调时怎样减少耗电并保持制冷效率？",
+    "expected_product": "空调",
+    "expected_image_ids": [
+      "Manual01_0"
+    ]
+  },
+  {
+    "case_id": "camera_wrist_strap",
+    "question": "相机腕带应该怎样安装，使用时为什么要套在手腕上？",
+    "expected_product": "相机",
+    "expected_image_ids": [
+      "Manual29_11"
+    ]
   }
 ]

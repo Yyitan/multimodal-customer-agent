@@ -37,5 +37,29 @@
       "drill0_05",
       "drill0_06"
     ]
+  },
+  {
+    "case_id": "air_purifier_filter_packaging",
+    "question": "新买的空气净化器滤网外面有塑料包装，不拆会有什么问题？",
+    "must_include_any": [
+      ["塑料包装", "包装"],
+      ["拆除", "取下"],
+      ["异响", "无法正常工作", "火灾", "损坏"]
+    ],
+    "expected_image_ids": [
+      "Manual03_2"
+    ]
+  },
+  {
+    "case_id": "vr_headset_child_age",
+    "question": "12岁以下的儿童可以使用这款VR头显吗？",
+    "must_include_any": [
+      ["12岁以下", "未满12岁"],
+      ["不适用", "不建议", "不能"],
+      ["安全", "风险", "警告"]
+    ],
+    "expected_image_ids": [
+      "Manual38_0"
+    ]
   }
 ]
