@@ -72,6 +72,13 @@ def main() -> None:
     health_response = client.get("/health")
     checks["健康检查返回200"] = health_response.status_code == 200
     checks["健康检查状态正确"] = health_response.json() == {"status": "ok"}
+    ready_response = client.get("/ready")
+    checks["就绪检查返回200"] = ready_response.status_code == 200
+    checks["就绪检查包含数据库和索引状态"] = (
+        ready_response.json()["status"] == "ready"
+        and ready_response.json()["database"] == "ok"
+        and ready_response.json()["index"]["record_count"] > 0
+    )
     # 请求参数校验（Pydantic 校验）
     empty_question_response = client.post(
         "/chat",

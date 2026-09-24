@@ -1,5 +1,7 @@
 import json 
+from functools import lru_cache
 from pathlib import Path
+from threading import RLock
 from typing import Any
 
 import numpy as np
@@ -70,9 +72,41 @@ validate_index(
     METADATA,
 )
 
-MODEL=SentenceTransformer(
-    METADATA["model_name"],
-)
+_MODEL_LOCK = RLock()
+
+
+@lru_cache(maxsize=1)
+def get_embedding_model() -> SentenceTransformer:
+    """按需加载嵌入模型，避免导入 API 模块时阻塞。"""
+    return SentenceTransformer(METADATA["model_name"])
+
+
+def is_embedding_model_loaded() -> bool:
+    """返回嵌入模型是否已经在当前进程完成加载。"""
+    return get_embedding_model.cache_info().currsize > 0
+
+
+def warm_up_semantic_retriever() -> dict[str, Any]:
+    """主动加载模型并验证模型维度与离线索引一致。"""
+    model = get_embedding_model()
+    model_dimension = model.get_embedding_dimension()
+    expected_dimension = int(METADATA["embedding_dimension"])
+    if model_dimension != expected_dimension:
+        raise ValueError(
+            "嵌入模型维度与知识索引不一致："
+            f"{model_dimension}!={expected_dimension}"
+        )
+    return semantic_index_status()
+
+
+def semantic_index_status() -> dict[str, Any]:
+    """返回已经校验过的知识索引摘要。"""
+    return {
+        "record_count": len(KNOWLEDGE_RECORDS),
+        "embedding_dimension": int(KNOWLEDGE_EMBEDDINGS.shape[1]),
+        "model_name": str(METADATA["model_name"]),
+        "model_loaded": is_embedding_model_loaded(),
+    }
 
 def semantic_search(
     query:str,
@@ -85,11 +119,13 @@ def semantic_search(
     
     query_text=QUERY_PREFIX+clean_query
     
-    query_vector=MODEL.encode(
-        query_text,
-        normalize_embeddings=True,
-        convert_to_numpy=True,
-    )
+    model = get_embedding_model()
+    with _MODEL_LOCK:
+        query_vector=model.encode(
+            query_text,
+            normalize_embeddings=True,
+            convert_to_numpy=True,
+        )
     
     similarity_scores=(
         KNOWLEDGE_EMBEDDINGS @ query_vector

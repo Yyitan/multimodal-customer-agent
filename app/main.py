@@ -2,6 +2,7 @@
 
 from contextlib import asynccontextmanager
 from secrets import compare_digest
+from typing import Any
 
 # 生成返回时间戳
 from datetime import datetime, timezone
@@ -16,13 +17,17 @@ from fastapi import (
     Header,
     HTTPException,
     Path as PathParameter,
+    Response,
 )
 
 # 用来规定接口JSON的格式，并自动检查用户传的数据是否合格
 # `field_validator`：Pydantic 的字段校验装饰器，
 from pydantic import BaseModel, Field, field_validator
 
-from app.config import get_settings
+from app.config import (
+    get_settings,
+    validate_runtime_settings,
+)
 from app.input_security import (
     ImageValidationError,
     RequestBodyLimitMiddleware,
@@ -32,6 +37,10 @@ from app.input_security import (
 from app.services.chat_service import answer_question
 from app.llm_client import LLMClientError
 from app.conversation_store import ConversationStore
+from app.semantic_retriever import (
+    semantic_index_status,
+    warm_up_semantic_retriever,
+)
 
 # 增加结构化日志（区分日志等级、写入文件、记录时间、记录异常堆栈，适合后端服务。）
 import logging
@@ -227,9 +236,16 @@ conversation_store=ConversationStore(
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    """在服务停止时主动释放 SQLite 连接。"""
-    yield
-    conversation_store.close()
+    """启动时校验依赖并按配置预热，停止时释放 SQLite。"""
+    try:
+        configuration_errors = validate_runtime_settings(settings)
+        if configuration_errors:
+            raise RuntimeError("；".join(configuration_errors))
+        if settings.preload_embedding_model:
+            warm_up_semantic_retriever()
+        yield
+    finally:
+        conversation_store.close()
 
 # 全局一次性配置日志系统。
 # 日志等级：`DEBUG`(调试) → `INFO`(正常运行信息) → `WARNING`警告 → `ERROR`错误 → `CRITICAL`严重故障
@@ -273,6 +289,34 @@ def health_check() -> dict[str, str]:
     """A small endpoint used to check whether the service is alive."""
 
     return {"status": "ok"}
+
+
+@app.get("/ready")
+def readiness_check(response: Response) -> dict[str, Any]:
+    """检查配置、会话数据库和知识索引是否可以提供服务。"""
+    errors = validate_runtime_settings(settings)
+    if not conversation_store.ping():
+        errors.append("会话数据库不可用。")
+
+    try:
+        index_status = semantic_index_status()
+    except (OSError, ValueError, KeyError) as error:
+        index_status = None
+        errors.append(f"知识索引不可用：{error}")
+
+    if errors:
+        response.status_code = 503
+        return {
+            "status": "not_ready",
+            "errors": errors,
+            "index": index_status,
+        }
+
+    return {
+        "status": "ready",
+        "database": "ok",
+        "index": index_status,
+    }
 
 # 新增接口：删除会话（清空某一个用户对话记忆）
 @app.delete(

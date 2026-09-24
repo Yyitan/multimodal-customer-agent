@@ -247,6 +247,15 @@ class ConversationStore:
             self._connection.close()
             self._closed = True
 
+    def ping(self) -> bool:
+        """验证数据库连接仍然可读写。"""
+        with self._lock:
+            if self._closed:
+                return False
+            return self._connection.execute(
+                "SELECT 1"
+            ).fetchone()[0] == 1
+
 def format_conversation_history(
     history: list[ConversationTurn],
 ) -> str:

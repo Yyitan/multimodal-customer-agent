@@ -150,6 +150,9 @@ class Settings(BaseSettings):
         ge=1024,
         le=64 * 1024 * 1024,
     )
+
+    # 正式服务启动时预加载嵌入模型，开发和测试可关闭以加快启动。
+    preload_embedding_model: bool = True
     
     # API 接口鉴权开关；后端对外提供接口的时候，开启鉴权，请求头带上 token 访问。本地调试默认关闭。
     auth_enabled:bool=False
@@ -208,4 +211,38 @@ class Settings(BaseSettings):
 def get_settings()->Settings:
     """Load and cache one Settings instance."""
     return Settings()
+
+
+def validate_runtime_settings(settings: Settings) -> list[str]:
+    """检查启动所需配置，返回所有可读错误。"""
+    errors: list[str] = []
+
+    if settings.auth_enabled:
+        token = (
+            settings.api_token.get_secret_value().strip()
+            if settings.api_token is not None
+            else ""
+        )
+        if not token:
+            errors.append("已启用鉴权但没有配置 AGENT_API_TOKEN。")
+    elif settings.environment == "production":
+        errors.append("生产环境必须启用 API Token 鉴权。")
+
+    if settings.llm_provider != "mock":
+        if not settings.llm_model.strip() or settings.llm_model == "mock":
+            errors.append("真实文本模型必须配置 AGENT_LLM_MODEL。")
+        if settings.llm_api_key is None or not (
+            settings.llm_api_key.get_secret_value().strip()
+        ):
+            errors.append("真实文本模型必须配置 AGENT_LLM_API_KEY。")
+
+    if settings.environment == "production":
+        if not settings.llm_vision_model:
+            errors.append("生产环境必须配置 AGENT_LLM_VISION_MODEL。")
+        if settings.llm_vision_api_key is None or not (
+            settings.llm_vision_api_key.get_secret_value().strip()
+        ):
+            errors.append("生产环境必须配置 AGENT_LLM_VISION_API_KEY。")
+
+    return errors
     
