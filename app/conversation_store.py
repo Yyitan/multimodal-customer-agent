@@ -1,100 +1,260 @@
-# OrderedDict：有序字典，记住 key 插入 / 访问顺序，用来实现 LRU（最近最少使用）淘汰
-# deque：双端队列，适合频繁头尾增删；支持maxlen，队列满了自动弹出最左边旧数据
-from collections import OrderedDict,deque
-# RLock：可重入锁（递归锁），多线程并发安全
+import sqlite3
+from pathlib import Path
 from threading import RLock
+from time import time_ns
 from typing import TypedDict
 
-# 定义一轮对话的结构：一次用户提问 + 一次模型回答。
+
 class ConversationTurn(TypedDict):
-    question:str
-    answer:str
+    """一轮对话的数据结构。"""
+
+    question: str
+    answer: str
+
 
 class ConversationStore:
-    """保存有限数量的内存对话。"""
+    """使用 SQLite 保存数量受限的多轮对话。"""
 
     def __init__(
         self,
-        max_turns:int=6,
-        max_sessions:int=1000,
-    )->None:
-        self.max_turns=max_turns # 单个session最多保存6轮问答
-        self.max_sessions=max_sessions # 全局最多同时保存1000哥不同用户会话
-  
-        # _sessions:key=session_id,value=deque存多轮对话
-        # _sessions：核心存储容器
-        self._sessions: OrderedDict[
-            str,
-            deque[ConversationTurn],
-        ] = OrderedDict()
+        max_turns: int = 6,
+        max_sessions: int = 1000,
+        db_path: str | Path = ":memory:",
+    ) -> None:
+        if max_turns < 1:
+            raise ValueError("max_turns 必须大于等于 1。")
+        if max_sessions < 1:
+            raise ValueError("max_sessions 必须大于等于 1。")
 
-        # _lock = RLock()：可重入锁;RLock：同一个线程可以多次 acquire 锁，不会死锁；普通 Lock 同一个线程拿两次锁会卡住。FastAPI 是多线程处理请求，多个请求线程同时读写_sessions，不加锁会出现数据错乱.with self._lock: 自动加锁、代码块结束自动释放锁。
-        self._lock=RLock()
+        self.max_turns = max_turns
+        self.max_sessions = max_sessions
+        self.db_path = str(db_path)
+        self._lock = RLock()
+
+        if self.db_path != ":memory:":
+            Path(self.db_path).expanduser().resolve().parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+
+        self._connection = sqlite3.connect(
+            self.db_path,
+            timeout=30,
+            check_same_thread=False,
+        )
+        self._closed = False
+        self._connection.row_factory = sqlite3.Row
+        self._connection.execute("PRAGMA foreign_keys = ON")
+        if self.db_path != ":memory:":
+            self._connection.execute("PRAGMA journal_mode = WAL")
+
+        self._create_schema()
+
+    def _create_schema(self) -> None:
+        """首次启动时创建会话表、对话表和查询索引。"""
+        with self._lock, self._connection:
+            self._connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS conversation_sessions (
+                    session_id TEXT PRIMARY KEY,
+                    last_accessed_at INTEGER NOT NULL
+                )
+                """
+            )
+            self._connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS conversation_turns (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    question TEXT NOT NULL,
+                    answer TEXT NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    FOREIGN KEY (session_id)
+                        REFERENCES conversation_sessions(session_id)
+                        ON DELETE CASCADE
+                )
+                """
+            )
+            self._connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_conversation_turns_session_id
+                ON conversation_turns(session_id, id)
+                """
+            )
   
     def get_history(
         self,
-        session_id:str,
-    )->list[ConversationTurn]:
-        """获取对话历史"""
-        # with self._lock：进入方法上锁，多线程排队读写
-        with self._lock:
-            # 根据 session_id 拿到该用户的对话队列，不存在返回空列表
-            turns=self._sessions.get(session_id)
-            if turns is None:
+        session_id: str,
+    ) -> list[ConversationTurn]:
+        """按时间顺序返回指定会话最近的问答历史。"""
+        clean_session_id = session_id.strip()
+        if not clean_session_id:
+            return []
+
+        with self._lock, self._connection:
+            session = self._connection.execute(
+                """
+                SELECT session_id
+                FROM conversation_sessions
+                WHERE session_id = ?
+                """,
+                (clean_session_id,),
+            ).fetchone()
+            if session is None:
                 return []
-            # 只要访问了这个会话，就把这个 session_id 移动到有序字典末尾，标记为「最近刚用过」
-            self._sessions.move_to_end(session_id)
-            # 返回拷贝，防止外部代码直接修改内部存储的原始对话数据，避免外部篡改污染内部状态。
-            return [turn.copy() for turn in turns]
+
+            self._connection.execute(
+                """
+                UPDATE conversation_sessions
+                SET last_accessed_at = ?
+                WHERE session_id = ?
+                """,
+                (time_ns(), clean_session_id),
+            )
+            rows = self._connection.execute(
+                """
+                SELECT question, answer
+                FROM (
+                    SELECT id, question, answer
+                    FROM conversation_turns
+                    WHERE session_id = ?
+                    ORDER BY id DESC
+                    LIMIT ?
+                )
+                ORDER BY id ASC
+                """,
+                (clean_session_id, self.max_turns),
+            ).fetchall()
+
+        return [
+            {
+                "question": str(row["question"]),
+                "answer": str(row["answer"]),
+            }
+            for row in rows
+        ]
 
     def append_turn(
         self,
-        session_id:str,
-        question:str,
-        answer:str,
-    )->None:
-        """新增一轮问答（核心写入方法）"""
-        clean_question=question.strip()
-        clean_answer=answer.strip()
-    
-        if not clean_question or not clean_answer:
+        session_id: str,
+        question: str,
+        answer: str,
+    ) -> None:
+        """新增一轮问答，并清理超出限制的旧数据。"""
+        clean_session_id = session_id.strip()
+        clean_question = question.strip()
+        clean_answer = answer.strip()
+        if not clean_session_id or not clean_question or not clean_answer:
             return
- 
-        with self._lock:
-            # 这个session不存在
-            if session_id not in self._sessions:
-                # 判断全局对话数量是否超限
-                if len(self._sessions)>=self.max_sessions:
-                    # popitem(last=False) 弹出有序字典最前面的key，也就是最久没访问的session
-                    self._sessions.popitem(last=False)
-     
-                # 创建新会话队列，deque设置maxlen=self.max_turns=6
-                # deque自带特性：队列元素达到maxlen之后，新增元素会自动删掉最左边旧的一轮对话
-                self._sessions[session_id]=deque(maxlen=self.max_turns) 
 
-            self._sessions[session_id].append({
-                "question":clean_question,
-                "answer":clean_answer,
-            })   
-
-            self._sessions.move_to_end(session_id)
+        accessed_at = time_ns()
+        with self._lock, self._connection:
+            self._connection.execute(
+                """
+                INSERT INTO conversation_sessions (
+                    session_id,
+                    last_accessed_at
+                )
+                VALUES (?, ?)
+                ON CONFLICT(session_id) DO UPDATE SET
+                    last_accessed_at = excluded.last_accessed_at
+                """,
+                (clean_session_id, accessed_at),
+            )
+            self._connection.execute(
+                """
+                INSERT INTO conversation_turns (
+                    session_id,
+                    question,
+                    answer,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    clean_session_id,
+                    clean_question,
+                    clean_answer,
+                    accessed_at,
+                ),
+            )
+            self._connection.execute(
+                """
+                DELETE FROM conversation_turns
+                WHERE session_id = ?
+                  AND id NOT IN (
+                      SELECT id
+                      FROM conversation_turns
+                      WHERE session_id = ?
+                      ORDER BY id DESC
+                      LIMIT ?
+                  )
+                """,
+                (
+                    clean_session_id,
+                    clean_session_id,
+                    self.max_turns,
+                ),
+            )
+            self._remove_old_sessions()
  
-    def clear(self,session_id:str)->bool:
-        """clear 删除指定会话"""
+    def _remove_old_sessions(self) -> None:
+        """删除超过 max_sessions 限制的最久未访问会话。"""
+        session_count = int(
+            self._connection.execute(
+                "SELECT COUNT(*) FROM conversation_sessions"
+            ).fetchone()[0]
+        )
+        excess_count = session_count - self.max_sessions
+        if excess_count <= 0:
+            return
+
+        self._connection.execute(
+            """
+            DELETE FROM conversation_sessions
+            WHERE session_id IN (
+                SELECT session_id
+                FROM conversation_sessions
+                ORDER BY last_accessed_at ASC, session_id ASC
+                LIMIT ?
+            )
+            """,
+            (excess_count,),
+        )
+
+    def clear(self, session_id: str) -> bool:
+        """删除指定会话及其全部问答。"""
+        clean_session_id = session_id.strip()
+        if not clean_session_id:
+            return False
+
+        with self._lock, self._connection:
+            cursor = self._connection.execute(
+                """
+                DELETE FROM conversation_sessions
+                WHERE session_id = ?
+                """,
+                (clean_session_id,),
+            )
+        return cursor.rowcount > 0
+
+    def close(self) -> None:
+        """关闭数据库连接，测试或应用退出时可以主动调用。"""
         with self._lock:
-            # pop：存在就删掉，返回被删value；不存在返回None
-            return self._sessions.pop(session_id,None) is not None
+            if self._closed:
+                return
+            self._connection.close()
+            self._closed = True
 
 def format_conversation_history(
-    history:list[ConversationTurn],
-)->str:
-    """格式化函数"""
-    lines:list[str]=[]
+    history: list[ConversationTurn],
+) -> str:
+    """把结构化历史转换为模型可读的角色文本。"""
+    lines: list[str] = []
     for turn in history:
-        # 从get_history()拿到对话列表
-        question=turn.get("question","").strip()
+        question = turn.get("question", "").strip()
         answer = turn.get("answer", "").strip()
-        # 输出：拼接成一段文本字符串，示例：
         if question:
             lines.append(f"用户：{question}")
         if answer:

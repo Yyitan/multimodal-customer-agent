@@ -18,6 +18,7 @@ def load_tests(
     # 延迟导入：`from scripts.xxx import main` 写在函数内部，不是文件顶部。
     # 好处：不加载不需要的测试模块，加快启动；而且 `--live` 不开时，不会加载调用真实 LLM 的 `test_multimodal_chain`
     from scripts.test_api import main as test_api
+    from scripts.test_auth import main as test_auth
     from scripts.test_conversation import main as test_conversation
     from scripts.test_output_sanitizer import (
         main as test_output_sanitizer,
@@ -38,6 +39,7 @@ def load_tests(
     # `tests` 是列表，每一项是元组：`(测试名称字符串, 测试函数)`
     tests = [
         ("接口层测试", test_api),
+        ("API鉴权测试", test_auth),
         ("多轮会话测试", test_conversation),
         ("回答清洗测试", test_output_sanitizer),
         ("图片候选排序测试", test_image_ranking),

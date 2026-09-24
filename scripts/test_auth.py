@@ -1,3 +1,4 @@
+import os
 from unittest.mock import patch
 
 # `SimpleNamespace`：可以动态造一个对象，用来模拟 settings 配置对象
@@ -6,6 +7,8 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
+
+os.environ["AGENT_CONVERSATION_DB_PATH"] = ":memory:"
 
 from app.main import app, conversation_store
 from scripts.test_api import make_service_result

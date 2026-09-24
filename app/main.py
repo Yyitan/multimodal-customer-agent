@@ -1,5 +1,7 @@
 """FastAPI entry point for the knowledge-based customer-service agent."""
 
+from contextlib import asynccontextmanager
+
 # 生成返回时间戳
 from datetime import datetime, timezone
 
@@ -187,7 +189,15 @@ def verify_api_token(
 conversation_store=ConversationStore(
     max_turns=settings.conversation_max_turns,
     max_sessions=settings.conversation_max_sessions,
+    db_path=settings.conversation_db_path,
 )
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """在服务停止时主动释放 SQLite 连接。"""
+    yield
+    conversation_store.close()
 
 # 全局一次性配置日志系统。
 # 日志等级：`DEBUG`(调试) → `INFO`(正常运行信息) → `WARNING`警告 → `ERROR`错误 → `CRITICAL`严重故障
@@ -214,6 +224,7 @@ app = FastAPI(
     title="Multimodal Customer Service Agent",
     version="0.3.0",
     description=("Multimodal customer-service API " "with hybrid knowledge retrieval"),
+    lifespan=lifespan,
 )
 
 

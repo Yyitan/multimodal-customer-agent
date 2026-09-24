@@ -1,3 +1,5 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from app.conversation_store import (
@@ -79,6 +81,57 @@ def main() -> None:
     checks["清空会话成功"] = (
         store.clear("session-001") is True and store.get_history("session-001") == []
     )
+    store.close()
+
+    # 临时数据库模拟服务重启，测试完成后由系统自动删除。
+    with TemporaryDirectory() as temporary_directory:
+        database_path = Path(temporary_directory) / "conversation.db"
+        first_store = ConversationStore(
+            max_turns=2,
+            max_sessions=2,
+            db_path=database_path,
+        )
+        first_store.append_turn(
+            "persistent-session",
+            "服务重启前的问题",
+            "服务重启前的回答",
+        )
+        first_store.close()
+
+        reopened_store = ConversationStore(
+            max_turns=2,
+            max_sessions=2,
+            db_path=database_path,
+        )
+        persistent_history = reopened_store.get_history(
+            "persistent-session"
+        )
+        checks["重启后仍能读取会话历史"] = (
+            len(persistent_history) == 1
+            and persistent_history[0]["question"]
+            == "服务重启前的问题"
+        )
+
+        reopened_store.append_turn(
+            "old-session",
+            "旧会话问题",
+            "旧会话回答",
+        )
+        reopened_store.get_history("persistent-session")
+        reopened_store.append_turn(
+            "new-session",
+            "新会话问题",
+            "新会话回答",
+        )
+        checks["超过会话上限时淘汰最久未访问会话"] = (
+            reopened_store.get_history("old-session") == []
+            and len(
+                reopened_store.get_history("persistent-session")
+            )
+            == 1
+            and len(reopened_store.get_history("new-session")) == 1
+        )
+        reopened_store.close()
 
     # Mock 整条业务链路，测试历史能否透传进检索 + Prompt
     history = [

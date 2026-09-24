@@ -1,6 +1,9 @@
+import os
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+
+os.environ["AGENT_CONVERSATION_DB_PATH"] = ":memory:"
 
 from app.llm_client import LLMClientError
 from app.main import app, conversation_store

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 # `Field`：pydantic 字段，给配置项设置默认值、数值校验范围。`SecretStr`：密码 / 密钥专用类型，打印的时候不会明文泄露 API‑key。
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 
 # `BaseSettings`：pydantic‑settings 基类，专门做环境变量 /`.env`配置加载。`SettingsConfigDict`：配置加载行为的配置字典。
 from pydantic_settings import (
@@ -155,6 +155,25 @@ class Settings(BaseSettings):
         le=10000,
     )
 
+    # SQLite 会话数据库文件。服务重启后仍可读取之前的对话。
+    conversation_db_path: Path = Field(
+        default=PROJECT_ROOT / "data" / "conversations.db",
+    )
+
+    @field_validator("conversation_db_path", mode="before")
+    @classmethod
+    def resolve_conversation_db_path(
+        cls,
+        value: str | Path,
+    ) -> Path:
+        """相对数据库路径统一以项目根目录为基准。"""
+        if str(value) == ":memory:":
+            return Path(":memory:")
+        path = Path(value).expanduser()
+        if path.is_absolute():
+            return path
+        return PROJECT_ROOT / path
+
 # 缓存装饰器 
 # - 第一次调用`get_settings()`，实例化`Settings()`，读取`.env`和环境变量，生成配置对象。
 # - 后续所有地方再次调用`get_settings()`，**直接返回缓存好的对象，不会重复读取解析.env 文件**。
@@ -162,5 +181,4 @@ class Settings(BaseSettings):
 def get_settings()->Settings:
     """Load and cache one Settings instance."""
     return Settings()
-    
     
