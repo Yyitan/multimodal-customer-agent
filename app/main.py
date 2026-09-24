@@ -309,7 +309,7 @@ logger = logging.getLogger(__name__)
 # 创建一个名为app的Web服务对象:FatAPI会自动读取这些信息,在http://127.0.0.1:8000/docs 生成可交互的接口文档
 app = FastAPI(
     title="Multimodal Customer Service Agent",
-    version="0.3.0",
+    version="1.0.0",
     description=("Multimodal customer-service API " "with hybrid knowledge retrieval"),
     lifespan=lifespan,
 )
