@@ -27,6 +27,7 @@ def load_tests(
     )
     from scripts.test_observability import main as test_observability
     from scripts.test_model_resilience import main as test_model_resilience
+    from scripts.test_knowledge_images import main as test_knowledge_images
     from scripts.test_image_ranking import (
         main as test_image_ranking,
     )
@@ -57,6 +58,7 @@ def load_tests(
         ("评测工具测试", test_evaluation),
         ("可观测性测试", test_observability),
         ("模型韧性测试", test_model_resilience),
+        ("知识图片目录测试", test_knowledge_images),
         ("回答清洗测试", test_output_sanitizer),
         ("图片候选排序测试", test_image_ranking),
         ("输入安全测试", test_input_security),

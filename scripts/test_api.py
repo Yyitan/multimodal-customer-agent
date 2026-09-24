@@ -93,6 +93,9 @@ def main() -> None:
         and ready_response.json()["support_database"] == "ok"
         and ready_response.json()["index"]["record_count"] > 0
     )
+    checks["v1健康检查可用"] = (
+        client.get("/v1/health").json() == {"status": "ok"}
+    )
     # 请求参数校验（Pydantic 校验）
     empty_question_response = client.post(
         "/chat",
@@ -271,6 +274,20 @@ def main() -> None:
         and "http_requests_total" in metrics_response.text
         and "support_tickets_created_total" in metrics_response.text
         and "customer_feedback_total" in metrics_response.text
+    )
+    v1_chat_response = client.post(
+        "/v1/chat",
+        json={"question": "我要转人工", "session_id": "v1-session"},
+    )
+    checks["v1问答接口与旧接口并存"] = (
+        v1_chat_response.status_code == 200
+        and v1_chat_response.json()["data"]["agent"]["handoff_required"]
+        is True
+    )
+    image_response = client.get("/v1/knowledge-images/Manual16_9")
+    checks["知识图片接口返回真实图片"] = (
+        image_response.status_code == 200
+        and image_response.headers["content-type"].startswith("image/")
     )
 
     print("====接口层测试====")

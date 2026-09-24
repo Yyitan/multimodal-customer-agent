@@ -23,10 +23,13 @@ def _format_labels(labels: LabelTuple) -> str:
 
 def normalize_http_path(path: str) -> str:
     """Collapse dynamic identifiers to bounded metric labels."""
-    if path.startswith("/sessions/"):
-        return "/sessions/{session_id}"
-    if path.startswith("/tickets/"):
-        return "/tickets/{ticket_id}"
+    for prefix in ("", "/v1"):
+        if path.startswith(f"{prefix}/sessions/"):
+            return f"{prefix}/sessions/{{session_id}}"
+        if path.startswith(f"{prefix}/tickets/"):
+            return f"{prefix}/tickets/{{ticket_id}}"
+        if path.startswith(f"{prefix}/knowledge-images/"):
+            return f"{prefix}/knowledge-images/{{image_id}}"
     return path
 
 

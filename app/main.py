@@ -21,6 +21,7 @@ from fastapi import (
     Request,
     Response,
 )
+from fastapi.responses import FileResponse
 
 # 用来规定接口JSON的格式，并自动检查用户传的数据是否合格
 # `field_validator`：Pydantic 的字段校验装饰器，
@@ -54,6 +55,7 @@ from app.request_control import (
     rate_limit_key,
 )
 from app.observability import MetricsMiddleware, MetricsRegistry
+from app.knowledge_images import IMAGE_ID_PATTERN, KnowledgeImageCatalog
 from app.support_store import SupportStore
 
 # 增加结构化日志（区分日志等级、写入文件、记录时间、记录异常堆栈，适合后端服务。）
@@ -172,6 +174,14 @@ class ChatMetrics(BaseModel):
     vision_product_hint: str | None
     vision_product_confidence: float | None
     vision_product_strategy: str
+    llm_attempt_count: int = 0
+    llm_retry_count: int = 0
+    llm_circuit_state: str = "not_called"
+
+
+class KnowledgeImage(BaseModel):
+    image_id: str
+    url: str
 
 
 class AgentMetadata(BaseModel):
@@ -242,6 +252,7 @@ class ChatData(BaseModel):
         default_factory=list,
         description="Image related to the answer",
     )
+    images: list[KnowledgeImage] = Field(default_factory=list)
     agent: AgentMetadata
     metrics: ChatMetrics
 
@@ -335,6 +346,9 @@ conversation_store = ConversationStore(
     db_path=settings.conversation_db_path,
 )
 support_store = SupportStore(db_path=settings.support_db_path)
+knowledge_image_catalog = KnowledgeImageCatalog(
+    settings.knowledge_image_dir
+)
 
 
 @asynccontextmanager
@@ -381,7 +395,7 @@ app = FastAPI(
 app.add_middleware(
     RequestBodyLimitMiddleware,
     max_body_bytes=settings.max_request_bytes,
-    paths={"/chat"},
+    paths={"/chat", "/v1/chat"},
 )
 app.add_middleware(RequestIdMiddleware)
 app.add_middleware(MetricsMiddleware, registry=metrics_registry)
@@ -390,14 +404,16 @@ app.add_middleware(MetricsMiddleware, registry=metrics_registry)
 # 当有人用 GET 请求访问 /health 时，执行下一行定义的 health_check 函数
 # GET:通常用于捕获/查看信息
 # /health :接口地址,也叫路径或路由
-@app.get("/health")
+@app.get("/health", include_in_schema=False)
+@app.get("/v1/health", tags=["system"])
 def health_check() -> dict[str, str]:
     """A small endpoint used to check whether the service is alive."""
 
     return {"status": "ok"}
 
 
-@app.get("/ready")
+@app.get("/ready", include_in_schema=False)
+@app.get("/v1/ready", tags=["system"])
 def readiness_check(response: Response) -> dict[str, Any]:
     """检查配置、会话数据库和知识索引是否可以提供服务。"""
     errors = validate_runtime_settings(settings)
@@ -430,6 +446,13 @@ def readiness_check(response: Response) -> dict[str, Any]:
 
 @app.get(
     "/metrics",
+    include_in_schema=False,
+    dependencies=[Depends(verify_api_token)],
+    response_class=Response,
+)
+@app.get(
+    "/v1/metrics",
+    tags=["operations"],
     dependencies=[Depends(verify_api_token)],
     response_class=Response,
 )
@@ -443,6 +466,12 @@ def metrics() -> Response:
 # 新增接口：删除会话（清空某一个用户对话记忆）
 @app.delete(
     "/sessions/{session_id}",
+    include_in_schema=False,
+    dependencies=[Depends(verify_api_token)],
+)
+@app.delete(
+    "/v1/sessions/{session_id}",
+    tags=["conversations"],
     dependencies=[Depends(verify_api_token)],
 )
 def clear_session(
@@ -463,6 +492,14 @@ def clear_session(
 
 @app.post(
     "/feedback",
+    include_in_schema=False,
+    response_model=FeedbackResponse,
+    status_code=201,
+    dependencies=[Depends(verify_api_token)],
+)
+@app.post(
+    "/v1/feedback",
+    tags=["quality"],
     response_model=FeedbackResponse,
     status_code=201,
     dependencies=[Depends(verify_api_token)],
@@ -496,6 +533,13 @@ def submit_feedback(
 
 @app.get(
     "/tickets",
+    include_in_schema=False,
+    response_model=list[SupportTicketResponse],
+    dependencies=[Depends(verify_api_token)],
+)
+@app.get(
+    "/v1/tickets",
+    tags=["support operations"],
     response_model=list[SupportTicketResponse],
     dependencies=[Depends(verify_api_token)],
 )
@@ -520,6 +564,13 @@ def list_support_tickets(
 
 @app.get(
     "/tickets/{ticket_id}",
+    include_in_schema=False,
+    response_model=SupportTicketResponse,
+    dependencies=[Depends(verify_api_token)],
+)
+@app.get(
+    "/v1/tickets/{ticket_id}",
+    tags=["support operations"],
     response_model=SupportTicketResponse,
     dependencies=[Depends(verify_api_token)],
 )
@@ -537,6 +588,13 @@ def get_support_ticket(
 
 @app.patch(
     "/tickets/{ticket_id}",
+    include_in_schema=False,
+    response_model=SupportTicketResponse,
+    dependencies=[Depends(verify_api_token)],
+)
+@app.patch(
+    "/v1/tickets/{ticket_id}",
+    tags=["support operations"],
     response_model=SupportTicketResponse,
     dependencies=[Depends(verify_api_token)],
 )
@@ -564,9 +622,41 @@ def update_support_ticket(
     )
     return SupportTicketResponse(**record)
 
+
+@app.get(
+    "/v1/knowledge-images/{image_id}",
+    tags=["knowledge"],
+    dependencies=[Depends(verify_api_token)],
+    response_class=FileResponse,
+)
+def get_knowledge_image(
+    image_id: str = PathParameter(
+        ...,
+        pattern=IMAGE_ID_PATTERN.pattern,
+    ),
+) -> FileResponse:
+    image_path = knowledge_image_catalog.resolve(image_id)
+    if image_path is None:
+        raise HTTPException(status_code=404, detail="知识图片不存在。")
+    return FileResponse(
+        image_path,
+        filename=image_path.name,
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
 # 当外部程序向 /chat 发送一个 POST 请求时，交给下面的 chat 函数处理；并且返回结果必须符合 ChatResponse 的格式
 @app.post(
     "/chat",
+    include_in_schema=False,
+    response_model=ChatResponse,
+    dependencies=[
+        Depends(verify_api_token),
+        Depends(enforce_rate_limit),
+    ],
+)
+@app.post(
+    "/v1/chat",
+    tags=["agent"],
     response_model=ChatResponse,
     dependencies=[
         Depends(verify_api_token),
@@ -782,6 +872,14 @@ def chat(
             timestamp=int(datetime.now(timezone.utc).timestamp()),
             references=references,
             image_ids=service_result["image_ids"],
+            images=[
+                KnowledgeImage(
+                    image_id=image_id,
+                    url=f"/v1/knowledge-images/{image_id}",
+                )
+                for image_id in service_result["image_ids"]
+                if knowledge_image_catalog.available(image_id)
+            ],
             agent=AgentMetadata(
                 intent=agent_decision.intent,
                 action=agent_decision.action,

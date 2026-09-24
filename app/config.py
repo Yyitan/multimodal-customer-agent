@@ -211,9 +211,15 @@ class Settings(BaseSettings):
         default=PROJECT_ROOT / "data" / "support.db",
     )
 
+    # 可由 Web/API 安全读取的知识库原图目录。
+    knowledge_image_dir: Path = Field(
+        default=PROJECT_ROOT / "data" / "knowledge_images",
+    )
+
     @field_validator(
         "conversation_db_path",
         "support_db_path",
+        "knowledge_image_dir",
         mode="before",
     )
     @classmethod
