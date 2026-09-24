@@ -11,6 +11,7 @@ from pydantic import SecretStr
 os.environ["AGENT_CONVERSATION_DB_PATH"] = ":memory:"
 
 from app.main import app, conversation_store
+from app.request_control import SlidingWindowRateLimiter
 from scripts.test_api import make_service_result
 
 client = TestClient(app)
@@ -117,6 +118,42 @@ def main() -> None:
         )
 
     checks["服务端未配置Token返回503"] = misconfigured_response.status_code == 503
+
+    rate_limit_settings = SimpleNamespace(
+        auth_enabled=False,
+        api_token=None,
+        rate_limit_enabled=True,
+        llm_provider="mock",
+        llm_model="mock",
+    )
+    test_limiter = SlidingWindowRateLimiter(
+        max_requests=1,
+        window_seconds=60,
+    )
+    with (
+        patch("app.main.settings", rate_limit_settings),
+        patch("app.main.rate_limiter", test_limiter),
+        patch(
+            "app.main.answer_question",
+            return_value=make_service_result("限流测试回答。"),
+        ),
+    ):
+        first_limited_response = client.post(
+            "/chat",
+            json={"question": "第一次限流测试"},
+        )
+        second_limited_response = client.post(
+            "/chat",
+            json={"question": "第二次限流测试"},
+        )
+
+    checks["限流范围内请求返回200"] = (
+        first_limited_response.status_code == 200
+    )
+    checks["超过限流返回429和Retry-After"] = (
+        second_limited_response.status_code == 429
+        and int(second_limited_response.headers["retry-after"]) > 0
+    )
 
     print("====API鉴权测试====")
 

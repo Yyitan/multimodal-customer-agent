@@ -153,11 +153,20 @@ class Settings(BaseSettings):
 
     # 正式服务启动时预加载嵌入模型，开发和测试可关闭以加快启动。
     preload_embedding_model: bool = True
-    
+
+    # 昂贵的问答接口限流；开发默认关闭，生产环境必须开启。
+    rate_limit_enabled: bool = False
+    rate_limit_requests: int = Field(default=30, ge=1, le=10000)
+    rate_limit_window_seconds: int = Field(
+        default=60,
+        ge=1,
+        le=3600,
+    )
+
     # API 接口鉴权开关；后端对外提供接口的时候，开启鉴权，请求头带上 token 访问。本地调试默认关闭。
-    auth_enabled:bool=False
-    api_token:SecretStr|None=None
-    
+    auth_enabled: bool = False
+    api_token: SecretStr | None = None
+
     # `model_config`：pydantic‑settings 的核心配置
     model_config=SettingsConfigDict(
         # 加载项目根目录下的`.env`文件。
@@ -227,6 +236,12 @@ def validate_runtime_settings(settings: Settings) -> list[str]:
             errors.append("已启用鉴权但没有配置 AGENT_API_TOKEN。")
     elif settings.environment == "production":
         errors.append("生产环境必须启用 API Token 鉴权。")
+
+    if (
+        settings.environment == "production"
+        and not settings.rate_limit_enabled
+    ):
+        errors.append("生产环境必须启用问答接口限流。")
 
     if settings.llm_provider != "mock":
         if not settings.llm_model.strip() or settings.llm_model == "mock":

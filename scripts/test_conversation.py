@@ -112,17 +112,22 @@ def main() -> None:
             == "服务重启前的问题"
         )
 
-        reopened_store.append_turn(
-            "old-session",
-            "旧会话问题",
-            "旧会话回答",
-        )
-        reopened_store.get_history("persistent-session")
-        reopened_store.append_turn(
-            "new-session",
-            "新会话问题",
-            "新会话回答",
-        )
+        # 即使系统时钟连续返回相同值，也应按真实访问顺序淘汰会话。
+        with patch(
+            "app.conversation_store.time_ns",
+            return_value=1,
+        ):
+            reopened_store.append_turn(
+                "old-session",
+                "旧会话问题",
+                "旧会话回答",
+            )
+            reopened_store.get_history("persistent-session")
+            reopened_store.append_turn(
+                "new-session",
+                "新会话问题",
+                "新会话回答",
+            )
         checks["超过会话上限时淘汰最久未访问会话"] = (
             reopened_store.get_history("old-session") == []
             and len(

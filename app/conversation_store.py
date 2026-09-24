@@ -82,7 +82,18 @@ class ConversationStore:
                 ON conversation_turns(session_id, id)
                 """
             )
-  
+
+    def _next_access_marker(self) -> int:
+        """Return a strictly increasing marker for deterministic LRU order."""
+        row = self._connection.execute(
+            """
+            SELECT COALESCE(MAX(last_accessed_at), 0)
+            FROM conversation_sessions
+            """
+        ).fetchone()
+        latest_marker = int(row[0])
+        return max(time_ns(), latest_marker + 1)
+
     def get_history(
         self,
         session_id: str,
@@ -110,7 +121,7 @@ class ConversationStore:
                 SET last_accessed_at = ?
                 WHERE session_id = ?
                 """,
-                (time_ns(), clean_session_id),
+                (self._next_access_marker(), clean_session_id),
             )
             rows = self._connection.execute(
                 """
@@ -148,8 +159,8 @@ class ConversationStore:
         if not clean_session_id or not clean_question or not clean_answer:
             return
 
-        accessed_at = time_ns()
         with self._lock, self._connection:
+            accessed_at = self._next_access_marker()
             self._connection.execute(
                 """
                 INSERT INTO conversation_sessions (
@@ -198,7 +209,7 @@ class ConversationStore:
                 ),
             )
             self._remove_old_sessions()
- 
+
     def _remove_old_sessions(self) -> None:
         """删除超过 max_sessions 限制的最久未访问会话。"""
         session_count = int(
@@ -255,6 +266,7 @@ class ConversationStore:
             return self._connection.execute(
                 "SELECT 1"
             ).fetchone()[0] == 1
+
 
 def format_conversation_history(
     history: list[ConversationTurn],

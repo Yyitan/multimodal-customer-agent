@@ -17,6 +17,7 @@ from fastapi import (
     Header,
     HTTPException,
     Path as PathParameter,
+    Request,
     Response,
 )
 
@@ -40,6 +41,11 @@ from app.conversation_store import ConversationStore
 from app.semantic_retriever import (
     semantic_index_status,
     warm_up_semantic_retriever,
+)
+from app.request_control import (
+    RequestIdMiddleware,
+    SlidingWindowRateLimiter,
+    rate_limit_key,
 )
 
 # 增加结构化日志（区分日志等级、写入文件、记录时间、记录异常堆栈，适合后端服务。）
@@ -192,16 +198,21 @@ class ChatResponse(BaseModel):
 
 
 settings = get_settings()
+rate_limiter = SlidingWindowRateLimiter(
+    max_requests=settings.rate_limit_requests,
+    window_seconds=settings.rate_limit_window_seconds,
+)
+
 
 def verify_api_token(
-    authorization:str|None=Header(default=None),
-)->None:
+    authorization: str | None = Header(default=None),
+) -> None:
     """根据配置校验请求是否携带正确的 Bearer Token。"""
     # 如果配置 `auth_enabled=false`（本地开发），鉴权直接关闭，不做任何校验，直接放行。
     if not settings.auth_enabled:
         return
 
-    configured_token=(
+    configured_token = (
         settings.api_token.get_secret_value()
         if settings.api_token is not None
         else ""
@@ -213,7 +224,7 @@ def verify_api_token(
             detail="服务器未配置 API Token。"
         )
 
-    expected_authorization=f"Bearer {configured_token}"
+    expected_authorization = f"Bearer {configured_token}"
     # 请求没有携带正确的 Authorization，返回 401。
     if not authorization or not compare_digest(
         authorization,
@@ -223,11 +234,39 @@ def verify_api_token(
             status_code=401,
             detail="缺少或错误的API Token。",
             headers={
-                "WWW-Authenticate":"Bearer",
+                "WWW-Authenticate": "Bearer",
             },
         )
+
+
+def enforce_rate_limit(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> None:
+    """按 Token 或客户端 IP 限制昂贵问答接口的调用频率。"""
+    if not getattr(settings, "rate_limit_enabled", False):
+        return
+
+    decision = rate_limiter.check(
+        rate_limit_key(
+            authorization=authorization,
+            client_host=(
+                request.client.host if request.client is not None else None
+            ),
+        )
+    )
+    if not decision.allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="请求过于频繁，请稍后重试。",
+            headers={
+                "Retry-After": str(decision.retry_after_seconds),
+            },
+        )
+
+
 # 只有完全匹配 Bearer Token 才允许进入业务函数。
-conversation_store=ConversationStore(
+conversation_store = ConversationStore(
     max_turns=settings.conversation_max_turns,
     max_sessions=settings.conversation_max_sessions,
     db_path=settings.conversation_db_path,
@@ -279,6 +318,7 @@ app.add_middleware(
     max_body_bytes=settings.max_request_bytes,
     paths={"/chat"},
 )
+app.add_middleware(RequestIdMiddleware)
 
 
 # 当有人用 GET 请求访问 /health 时，执行下一行定义的 health_check 函数
@@ -342,11 +382,15 @@ def clear_session(
 @app.post(
     "/chat",
     response_model=ChatResponse,
-    dependencies=[Depends(verify_api_token)],
+    dependencies=[
+        Depends(verify_api_token),
+        Depends(enforce_rate_limit),
+    ],
 )
 # 表示 FastAPI 会读取用户发来的 JSON，并根据之前写的 ChatRequest 规则自动转换、检查，然后传给 request
 def chat(
     request: ChatRequest,
+    http_request: Request,
 ) -> ChatResponse:  # 表示这个函数最终返回的数据，应符合之前定义的 ChatResponse 结构
     """Generate a grounded answer using retrieval and an LLM."""
     # 如果用户传了 session_id，就使用用户传的；否则，自动生成一个新的 session_id。
@@ -369,7 +413,8 @@ def chat(
         # 如果用logger.error()，不会自动带上堆栈，排查问题很难。
         logger.exception(
             # `chat_failed` 标记：这条日志代表一次问答失败，`%s` 是占位符，后面依次填入 `session_id, provider, model`。session_id：会话编号，用来追踪这一次失败请求，后续可以根据 session_id 定位整条链路。
-            "chat_failed session_id=%s provider=%s model=%s",
+            "chat_failed request_id=%s session_id=%s provider=%s model=%s",
+            http_request.state.request_id,
             session_id,
             settings.llm_provider,
             settings.llm_model,
@@ -390,6 +435,7 @@ def chat(
     logger.info(
         (
             "chat_completed session_id=%s "
+            "request_id=%s "
             "provider=%s model=%s "
             "vision_analysis_ms=%s vision_fallback=%s "
             "retrieval_ms=%s llm_ms=%s total_ms=%s "
@@ -399,6 +445,7 @@ def chat(
         ),
 
         session_id,
+        http_request.state.request_id,
         metrics["provider"],
         metrics["model"],
         metrics["vision_analysis_latency_ms"],

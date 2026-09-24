@@ -36,6 +36,9 @@ def load_tests(
         main as test_product_strategy_chain,
     )
     from scripts.test_readiness import main as test_readiness
+    from scripts.test_request_control import (
+        main as test_request_control,
+    )
     from scripts.test_vision_fallback import (
         main as test_vision_fallback,
     )
@@ -49,6 +52,7 @@ def load_tests(
         ("图片候选排序测试", test_image_ranking),
         ("输入安全测试", test_input_security),
         ("运行就绪测试", test_readiness),
+        ("请求控制测试", test_request_control),
         ("产品置信度测试", test_product_confidence),
         ("产品策略业务链测试", test_product_strategy_chain),
         ("视觉降级测试", test_vision_fallback),

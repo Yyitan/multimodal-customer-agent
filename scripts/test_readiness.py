@@ -33,8 +33,9 @@ def main() -> None:
         production_settings
     )
     checks["生产模式拒绝缺失鉴权和模型密钥"] = (
-        len(production_errors) == 4
+        len(production_errors) == 5
         and any("API Token" in error for error in production_errors)
+        and any("限流" in error for error in production_errors)
         and any("LLM_API_KEY" in error for error in production_errors)
         and any("VISION_MODEL" in error for error in production_errors)
         and any("VISION_API_KEY" in error for error in production_errors)

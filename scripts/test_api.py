@@ -72,6 +72,18 @@ def main() -> None:
     health_response = client.get("/health")
     checks["健康检查返回200"] = health_response.status_code == 200
     checks["健康检查状态正确"] = health_response.json() == {"status": "ok"}
+    checks["响应自动包含请求ID"] = bool(
+        health_response.headers.get("x-request-id")
+    )
+    supplied_request_id = "client-request-001"
+    echoed_response = client.get(
+        "/health",
+        headers={"X-Request-ID": supplied_request_id},
+    )
+    checks["合法调用方请求ID被原样返回"] = (
+        echoed_response.headers.get("x-request-id")
+        == supplied_request_id
+    )
     ready_response = client.get("/ready")
     checks["就绪检查返回200"] = ready_response.status_code == 200
     checks["就绪检查包含数据库和索引状态"] = (
