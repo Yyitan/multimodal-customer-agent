@@ -4,9 +4,10 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 os.environ["AGENT_CONVERSATION_DB_PATH"] = ":memory:"
+os.environ["AGENT_SUPPORT_DB_PATH"] = ":memory:"
 
 from app.llm_client import LLMClientError
-from app.main import app, conversation_store
+from app.main import app, conversation_store, support_store
 
 """FastAPI 接口层的集成测试脚本"""
 
@@ -89,6 +90,7 @@ def main() -> None:
     checks["就绪检查包含数据库和索引状态"] = (
         ready_response.json()["status"] == "ready"
         and ready_response.json()["database"] == "ok"
+        and ready_response.json()["support_database"] == "ok"
         and ready_response.json()["index"]["record_count"] > 0
     )
     # 请求参数校验（Pydantic 校验）
@@ -229,6 +231,37 @@ def main() -> None:
         and handoff_response.json()["data"]["agent"]["handoff_required"]
         is True
         and handoff_answer_mock.call_count == 0
+    )
+    handoff_data = handoff_response.json()["data"]
+    ticket_id = handoff_data["agent"]["ticket_id"]
+    ticket_response = client.get(f"/tickets/{ticket_id}")
+    checks["转人工请求自动创建可查询工单"] = (
+        ticket_response.status_code == 200
+        and ticket_response.json()["session_id"] == "handoff-session"
+        and ticket_response.json()["status"] == "open"
+    )
+
+    update_ticket_response = client.patch(
+        f"/tickets/{ticket_id}",
+        json={"status": "in_progress"},
+    )
+    checks["工单接口支持状态流转"] = (
+        update_ticket_response.status_code == 200
+        and update_ticket_response.json()["status"] == "in_progress"
+    )
+
+    feedback_response = client.post(
+        "/feedback",
+        json={
+            "session_id": "handoff-session",
+            "request_id": handoff_data["request_id"],
+            "rating": 5,
+            "comment": "人工转接清晰。",
+        },
+    )
+    checks["反馈接口保存评分"] = (
+        feedback_response.status_code == 201
+        and feedback_response.json()["rating"] == 5
     )
 
     print("====接口层测试====")

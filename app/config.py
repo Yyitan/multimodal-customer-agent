@@ -199,9 +199,18 @@ class Settings(BaseSettings):
         default=PROJECT_ROOT / "data" / "conversations.db",
     )
 
-    @field_validator("conversation_db_path", mode="before")
+    # 工单和用户反馈使用独立数据库，便于单独备份和迁移。
+    support_db_path: Path = Field(
+        default=PROJECT_ROOT / "data" / "support.db",
+    )
+
+    @field_validator(
+        "conversation_db_path",
+        "support_db_path",
+        mode="before",
+    )
     @classmethod
-    def resolve_conversation_db_path(
+    def resolve_database_path(
         cls,
         value: str | Path,
     ) -> Path:

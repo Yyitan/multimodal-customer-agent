@@ -3,6 +3,7 @@ from pydantic import SecretStr
 from app.config import Settings, validate_runtime_settings
 from app.conversation_store import ConversationStore
 from app.semantic_retriever import semantic_index_status
+from app.support_store import SupportStore
 
 
 def main() -> None:
@@ -53,6 +54,13 @@ def main() -> None:
     checks["SQLite连接健康检查成功"] = store.ping() is True
     store.close()
     checks["SQLite关闭后健康检查失败"] = store.ping() is False
+
+    support_store = SupportStore(db_path=":memory:")
+    checks["客服闭环数据库健康检查成功"] = support_store.ping() is True
+    support_store.close()
+    checks["客服闭环数据库关闭后检查失败"] = (
+        support_store.ping() is False
+    )
 
     print("====运行就绪测试====")
     for name, passed in checks.items():

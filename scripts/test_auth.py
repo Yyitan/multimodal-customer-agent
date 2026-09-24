@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 os.environ["AGENT_CONVERSATION_DB_PATH"] = ":memory:"
+os.environ["AGENT_SUPPORT_DB_PATH"] = ":memory:"
 
 from app.main import app, conversation_store
 from app.request_control import SlidingWindowRateLimiter

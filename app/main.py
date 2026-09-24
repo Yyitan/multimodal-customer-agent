@@ -2,7 +2,7 @@
 
 from contextlib import asynccontextmanager
 from secrets import compare_digest
-from typing import Any
+from typing import Any, Literal
 
 # 生成返回时间戳
 from datetime import datetime, timezone
@@ -17,6 +17,7 @@ from fastapi import (
     Header,
     HTTPException,
     Path as PathParameter,
+    Query,
     Request,
     Response,
 )
@@ -47,10 +48,12 @@ from app.semantic_retriever import (
     warm_up_semantic_retriever,
 )
 from app.request_control import (
+    REQUEST_ID_PATTERN,
     RequestIdMiddleware,
     SlidingWindowRateLimiter,
     rate_limit_key,
 )
+from app.support_store import SupportStore
 
 # 增加结构化日志（区分日志等级、写入文件、记录时间、记录异常堆栈，适合后端服务。）
 import logging
@@ -181,12 +184,54 @@ class AgentMetadata(BaseModel):
     ticket_id: str | None = None
 
 
+class FeedbackRequest(BaseModel):
+    session_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+        pattern=SESSION_ID_PATTERN.pattern,
+    )
+    request_id: str | None = Field(
+        default=None,
+        max_length=64,
+        pattern=REQUEST_ID_PATTERN.pattern,
+    )
+    rating: int = Field(..., ge=1, le=5)
+    comment: str = Field(default="", max_length=1000)
+
+
+class FeedbackResponse(BaseModel):
+    feedback_id: str
+    session_id: str
+    request_id: str
+    rating: int
+    comment: str
+    created_at: int
+
+
+class TicketStatusUpdate(BaseModel):
+    status: Literal["open", "in_progress", "resolved", "closed"]
+
+
+class SupportTicketResponse(BaseModel):
+    ticket_id: str
+    session_id: str
+    request_id: str
+    question: str
+    reason: str
+    priority: Literal["normal", "high", "urgent"]
+    status: Literal["open", "in_progress", "resolved", "closed"]
+    created_at: int
+    updated_at: int
+
+
 # 规定真正业务结果的格式
 class ChatData(BaseModel):
     """Business data nested inside the API response."""
 
     answer: str
     session_id: str
+    request_id: str
     timestamp: int
     references: list[KnowledgeReference] = Field(
         default_factory=list,
@@ -287,6 +332,7 @@ conversation_store = ConversationStore(
     max_sessions=settings.conversation_max_sessions,
     db_path=settings.conversation_db_path,
 )
+support_store = SupportStore(db_path=settings.support_db_path)
 
 
 @asynccontextmanager
@@ -301,6 +347,7 @@ async def lifespan(_: FastAPI):
         yield
     finally:
         conversation_store.close()
+        support_store.close()
 
 # 全局一次性配置日志系统。
 # 日志等级：`DEBUG`(调试) → `INFO`(正常运行信息) → `WARNING`警告 → `ERROR`错误 → `CRITICAL`严重故障
@@ -353,6 +400,8 @@ def readiness_check(response: Response) -> dict[str, Any]:
     errors = validate_runtime_settings(settings)
     if not conversation_store.ping():
         errors.append("会话数据库不可用。")
+    if not support_store.ping():
+        errors.append("工单数据库不可用。")
 
     try:
         index_status = semantic_index_status()
@@ -371,6 +420,7 @@ def readiness_check(response: Response) -> dict[str, Any]:
     return {
         "status": "ready",
         "database": "ok",
+        "support_database": "ok",
         "index": index_status,
     }
 
@@ -393,6 +443,90 @@ def clear_session(
         "session_id":session_id,
         "cleared":cleared,
     }
+
+
+@app.post(
+    "/feedback",
+    response_model=FeedbackResponse,
+    status_code=201,
+    dependencies=[Depends(verify_api_token)],
+)
+def submit_feedback(
+    payload: FeedbackRequest,
+    request: Request,
+) -> FeedbackResponse:
+    """Persist customer feedback for later quality analysis."""
+    record = support_store.add_feedback(
+        session_id=payload.session_id,
+        request_id=(
+            payload.request_id or request.state.request_id
+        ),
+        rating=payload.rating,
+        comment=payload.comment,
+    )
+    return FeedbackResponse(**record)
+
+
+@app.get(
+    "/tickets",
+    response_model=list[SupportTicketResponse],
+    dependencies=[Depends(verify_api_token)],
+)
+def list_support_tickets(
+    status: Literal[
+        "open",
+        "in_progress",
+        "resolved",
+        "closed",
+    ] | None = None,
+    limit: int = Query(default=50, ge=1, le=100),
+) -> list[SupportTicketResponse]:
+    """List recent tickets for the support operations view."""
+    return [
+        SupportTicketResponse(**record)
+        for record in support_store.list_tickets(
+            status=status,
+            limit=limit,
+        )
+    ]
+
+
+@app.get(
+    "/tickets/{ticket_id}",
+    response_model=SupportTicketResponse,
+    dependencies=[Depends(verify_api_token)],
+)
+def get_support_ticket(
+    ticket_id: str = PathParameter(
+        ...,
+        pattern=r"^ticket_[a-f0-9]{16}$",
+    ),
+) -> SupportTicketResponse:
+    record = support_store.get_ticket(ticket_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="工单不存在。")
+    return SupportTicketResponse(**record)
+
+
+@app.patch(
+    "/tickets/{ticket_id}",
+    response_model=SupportTicketResponse,
+    dependencies=[Depends(verify_api_token)],
+)
+def update_support_ticket(
+    payload: TicketStatusUpdate,
+    ticket_id: str = PathParameter(
+        ...,
+        pattern=r"^ticket_[a-f0-9]{16}$",
+    ),
+) -> SupportTicketResponse:
+    record = support_store.update_ticket_status(
+        ticket_id,
+        payload.status,
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="工单不存在。")
+    return SupportTicketResponse(**record)
 
 # 当外部程序向 /chat 发送一个 POST 请求时，交给下面的 chat 函数处理；并且返回结果必须符合 ChatResponse 的格式
 @app.post(
@@ -460,6 +594,28 @@ def chat(
                 or service_result["answer"]
             )
 
+    ticket_id: str | None = None
+    if agent_decision.handoff_required:
+        priority = (
+            "urgent"
+            if agent_decision.intent == "safety_risk"
+            else "high"
+            if agent_decision.intent == "business_action"
+            else "normal"
+        )
+        ticket = support_store.create_ticket(
+            session_id=session_id,
+            request_id=http_request.state.request_id,
+            question=request.question,
+            reason=agent_decision.handoff_reason or "human_review_required",
+            priority=priority,
+        )
+        ticket_id = str(ticket["ticket_id"])
+        service_result["answer"] = (
+            f"{service_result['answer']} "
+            f"已创建人工服务工单，编号：{ticket_id}。"
+        )
+
     conversation_store.append_turn(
         session_id=session_id,
         question=request.question,
@@ -509,6 +665,7 @@ def chat(
         data=ChatData(
             answer=service_result["answer"],
             session_id=session_id,
+            request_id=http_request.state.request_id,
             timestamp=int(datetime.now(timezone.utc).timestamp()),
             references=references,
             image_ids=service_result["image_ids"],
@@ -518,6 +675,7 @@ def chat(
                 confidence=agent_decision.confidence,
                 handoff_required=agent_decision.handoff_required,
                 handoff_reason=agent_decision.handoff_reason,
+                ticket_id=ticket_id,
             ),
             metrics=ChatMetrics(
                 # `**` 字典解包，把字典里所有 `key:value`，拆成一个个独立的关键字参数传给类 / 函数。（`*列表`：列表解包 → 拆成位置参数）
