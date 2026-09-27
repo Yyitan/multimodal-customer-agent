@@ -239,6 +239,60 @@ class SupportStore:
             ).fetchone()
         return dict(row)
 
+    def get_operations_summary(self) -> dict[str, Any]:
+        """Return ticket and feedback aggregates for support operations."""
+        with self._lock:
+            ticket_rows = self._connection.execute(
+                """
+                SELECT status, COUNT(*) AS count
+                FROM support_tickets
+                GROUP BY status
+                """
+            ).fetchall()
+            urgent_open_count = self._connection.execute(
+                """
+                SELECT COUNT(*)
+                FROM support_tickets
+                WHERE priority = 'urgent'
+                  AND status IN ('open', 'in_progress')
+                """
+            ).fetchone()[0]
+            feedback_rows = self._connection.execute(
+                """
+                SELECT rating, COUNT(*) AS count
+                FROM customer_feedback
+                GROUP BY rating
+                """
+            ).fetchall()
+            feedback_stats = self._connection.execute(
+                """
+                SELECT COUNT(*) AS count, AVG(rating) AS average
+                FROM customer_feedback
+                """
+            ).fetchone()
+
+        ticket_counts = {status: 0 for status in sorted(TICKET_STATUSES)}
+        ticket_counts.update(
+            {str(row["status"]): int(row["count"]) for row in ticket_rows}
+        )
+        rating_counts = {str(rating): 0 for rating in range(1, 6)}
+        rating_counts.update(
+            {str(row["rating"]): int(row["count"]) for row in feedback_rows}
+        )
+        average = feedback_stats["average"]
+        return {
+            "ticket_counts": ticket_counts,
+            "active_ticket_count": (
+                ticket_counts["open"] + ticket_counts["in_progress"]
+            ),
+            "urgent_open_count": int(urgent_open_count),
+            "feedback_count": int(feedback_stats["count"]),
+            "feedback_average_rating": (
+                round(float(average), 2) if average is not None else None
+            ),
+            "rating_counts": rating_counts,
+        }
+
     def ping(self) -> bool:
         with self._lock:
             if self._closed:

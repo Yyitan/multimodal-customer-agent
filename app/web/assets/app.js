@@ -341,6 +341,21 @@ const statusLabels = {
 };
 const priorityLabels = { normal: "普通", high: "高", urgent: "紧急" };
 
+async function loadOperationsSummary() {
+  try {
+    const response = await api("/v1/operations/summary");
+    const summary = await response.json();
+    byId("active-ticket-count").textContent = summary.active_ticket_count;
+    byId("urgent-ticket-count").textContent = summary.urgent_open_count;
+    byId("feedback-count").textContent = summary.feedback_count;
+    byId("feedback-average").textContent = summary.feedback_average_rating === null
+      ? "暂无"
+      : `${summary.feedback_average_rating.toFixed(2)} / 5`;
+  } catch (error) {
+    showToast(`运营摘要加载失败：${error.message}`);
+  }
+}
+
 async function loadTickets() {
   const status = byId("ticket-filter").value;
   const body = byId("ticket-body");
@@ -426,7 +441,7 @@ async function advanceTicket(ticket) {
       body: JSON.stringify({ status: nextStatus }),
     });
     showToast(`工单已更新为${statusLabels[nextStatus]}`);
-    await loadTickets();
+    await Promise.all([loadTickets(), loadOperationsSummary()]);
   } catch (error) {
     showToast(error.message);
   }
@@ -440,7 +455,10 @@ document.querySelectorAll(".nav-item").forEach((button) => {
     document.querySelectorAll(".view").forEach((view) => {
       view.classList.toggle("active", view.id === `${button.dataset.view}-view`);
     });
-    if (button.dataset.view === "tickets") loadTickets();
+    if (button.dataset.view === "tickets") {
+      loadTickets();
+      loadOperationsSummary();
+    }
   });
 });
 
@@ -467,7 +485,10 @@ byId("save-token").addEventListener("click", () => {
 byId("chat-form").addEventListener("submit", submitQuestion);
 imageInput.addEventListener("change", handleImages);
 byId("new-session").addEventListener("click", startNewSession);
-byId("refresh-tickets").addEventListener("click", loadTickets);
+byId("refresh-tickets").addEventListener("click", () => {
+  loadTickets();
+  loadOperationsSummary();
+});
 byId("ticket-filter").addEventListener("change", loadTickets);
 
 ensureSession();

@@ -29,6 +29,7 @@ def main() -> None:
         and 'api("/v1/chat"' in script.text
         and 'api("/v1/feedback"' in script.text
         and "/v1/tickets" in script.text
+        and "/v1/operations/summary" in script.text
         and "formatTimestamp" in script.text
     )
 

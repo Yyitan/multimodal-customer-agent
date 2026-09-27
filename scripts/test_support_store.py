@@ -58,6 +58,21 @@ def main() -> None:
             and "更简洁" in feedback["comment"]
         )
 
+        store.add_feedback(
+            session_id="support-session",
+            request_id="request-002",
+            rating=2,
+        )
+        summary = store.get_operations_summary()
+        checks["运营摘要聚合工单和评分"] = (
+            summary["ticket_counts"]["in_progress"] == 1
+            and summary["active_ticket_count"] == 1
+            and summary["urgent_open_count"] == 0
+            and summary["feedback_count"] == 2
+            and summary["feedback_average_rating"] == 3.0
+            and summary["rating_counts"]["4"] == 1
+        )
+
         store.close()
         reopened = SupportStore(database_path)
         persisted = reopened.get_ticket(ticket["ticket_id"])

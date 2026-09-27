@@ -267,6 +267,15 @@ def main() -> None:
         and feedback_response.json()["rating"] == 5
     )
 
+    summary_response = client.get("/v1/operations/summary")
+    summary_payload = summary_response.json()
+    checks["运营摘要接口聚合工单和反馈"] = (
+        summary_response.status_code == 200
+        and summary_payload["active_ticket_count"] >= 1
+        and summary_payload["feedback_count"] >= 1
+        and summary_payload["feedback_average_rating"] == 5.0
+    )
+
     metrics_response = client.get("/metrics")
     checks["指标接口输出Agent和HTTP指标"] = (
         metrics_response.status_code == 200

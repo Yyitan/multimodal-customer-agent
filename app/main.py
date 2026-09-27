@@ -238,6 +238,15 @@ class SupportTicketResponse(BaseModel):
     updated_at: int
 
 
+class OperationsSummaryResponse(BaseModel):
+    ticket_counts: dict[str, int]
+    active_ticket_count: int
+    urgent_open_count: int
+    feedback_count: int
+    feedback_average_rating: float | None
+    rating_counts: dict[str, int]
+
+
 # 规定真正业务结果的格式
 class ChatData(BaseModel):
     """Business data nested inside the API response."""
@@ -574,6 +583,17 @@ def list_support_tickets(
             limit=limit,
         )
     ]
+
+
+@app.get(
+    "/v1/operations/summary",
+    tags=["support operations"],
+    response_model=OperationsSummaryResponse,
+    dependencies=[Depends(verify_api_token)],
+)
+def get_operations_summary() -> OperationsSummaryResponse:
+    """Return aggregate ticket and customer feedback indicators."""
+    return OperationsSummaryResponse(**support_store.get_operations_summary())
 
 
 @app.get(

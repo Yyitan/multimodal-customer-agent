@@ -120,6 +120,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .reference-item strong { font-size: 12px; }
 .reference-item span { margin-top: 2px; color: var(--muted); font-size: 10px; }
 
+.operations-summary { padding: 18px 28px 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.operations-summary > div { min-height: 78px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.operations-summary span, .operations-summary strong { display: block; }
+.operations-summary span { color: var(--muted); font-size: 11px; }
+.operations-summary strong { margin-top: 5px; font-size: 21px; }
 .ticket-toolbar { min-height: 48px; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 .table-wrap { margin: 22px 28px; overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
 table { width: 100%; min-width: 860px; border-collapse: collapse; }
@@ -157,6 +162,7 @@ select { min-height: 38px; padding: 7px 30px 7px 10px; border: 1px solid #c8d0cc
   .inspector { border-top: 1px solid var(--line); border-left: 0; }
   .composer { position: sticky; bottom: 0; }
   .ticket-toolbar { padding: 0 16px; }
+  .operations-summary { padding: 14px 14px 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .table-wrap { margin: 14px; }
 }
 
