@@ -30,6 +30,7 @@ def load_tests(
     from scripts.test_knowledge_images import main as test_knowledge_images
     from scripts.test_web_console import main as test_web_console
     from scripts.test_benchmark import main as test_benchmark
+    from scripts.test_release import main as test_release
     from scripts.test_image_ranking import (
         main as test_image_ranking,
     )
@@ -63,6 +64,7 @@ def load_tests(
         ("知识图片目录测试", test_knowledge_images),
         ("Web工作台测试", test_web_console),
         ("性能基线工具测试", test_benchmark),
+        ("发布完整性测试", test_release),
         ("回答清洗测试", test_output_sanitizer),
         ("图片候选排序测试", test_image_ranking),
         ("输入安全测试", test_input_security),

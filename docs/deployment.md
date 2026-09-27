@@ -1,34 +1,37 @@
 # 生产部署
 
-## 配置准备
+## 发布前检查
 
-复制生产模板并替换所有占位值：
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m compileall -q app scripts
+python -m scripts.run_regression
+python -m scripts.evaluate_retrieval
+python -m scripts.evaluate_agent
+git diff --check
+git status
+```
+
+有真实模型额度时再运行：
+
+```powershell
+python -m scripts.evaluate_generation
+python -m scripts.run_regression --live
+```
+
+## 生产配置
 
 ```powershell
 Copy-Item .env.production.example .env
 ```
 
-生产启动校验会强制要求：
+必须替换以下占位值：
 
-- `AGENT_AUTH_ENABLED=true` 且配置 `AGENT_API_TOKEN`
-- `AGENT_RATE_LIMIT_ENABLED=true`
-- 文本模型名称和 API Key
-- 视觉模型名称和 API Key
+- 文本模型的 Provider、Model、Base URL 与 API Key。
+- 视觉模型的 Provider、Model、Base URL 与 API Key。
+- 长随机值 `AGENT_API_TOKEN`。
 
-不要把 `.env`、密钥或 Token 提交到 Git。
-
-## 发布前检查
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-python -m scripts.run_regression
-python -m scripts.evaluate_retrieval
-python -m scripts.evaluate_generation
-git diff --check
-git status
-```
-
-真实生成评测依赖模型供应商可用额度。429、超时或供应商故障会被写入 `artifacts/evaluation/generation.json` 并返回非零退出码。
+生产启动校验要求鉴权和限流开启，且真实模型配置完整。`.env`、API Key 和 Token 不得提交到 Git。
 
 ## Docker Compose
 
@@ -38,10 +41,13 @@ docker compose ps
 docker compose logs -f agent
 ```
 
-服务端口为 `8000`。Compose 会持久化：
+Compose 配置：
 
-- `agent-data`：SQLite 会话数据库
-- `huggingface-cache`：Embedding 模型缓存
+- 非 root 用户运行。
+- 单 Uvicorn Worker。
+- `/v1/ready` 容器健康检查。
+- `agent-data` 保存 `conversations.db` 和 `support.db`。
+- `huggingface-cache` 保存 Embedding 模型缓存。
 
 停止服务：
 
@@ -49,33 +55,78 @@ docker compose logs -f agent
 docker compose down
 ```
 
-删除命名卷会永久清空会话数据库和模型缓存，除非明确需要，不要使用 `docker compose down -v`。
+除非明确需要清空数据，不要执行 `docker compose down -v`。
 
-## 健康检查
+## 启动验证
 
-- `/health` 只表示 Web 进程存活。
-- `/ready` 会检查运行配置、SQLite 和知识索引；只有返回 200 才应该接收流量。
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/v1/info
+Invoke-RestMethod http://127.0.0.1:8000/v1/health
+Invoke-RestMethod http://127.0.0.1:8000/v1/ready
+```
 
-反向代理或容器平台应使用 `/ready` 作为 readiness probe，并为 `/chat` 配置大于模型最大响应时间的上游超时。
+随后使用生产 Token 调用 `/v1/chat`、`/v1/tickets` 和 `/v1/metrics`。
 
-## 单 Worker 约束
+## 性能基线
 
-生产命令固定为 `--workers 1`，原因是：
+对目标环境执行：
 
-- 限流状态位于单进程内存中。
-- 每个进程会建立自己的 SQLite 连接和模型对象。
-- 多 worker 会重复加载 Embedding 模型，显著增加内存占用。
+```powershell
+python -m scripts.benchmark_api `
+  --base-url https://agent.example.com `
+  --token $env:AGENT_API_TOKEN `
+  --requests 100 `
+  --concurrency 10 `
+  --max-p95-ms 10000 `
+  --max-error-rate 0.01
+```
 
-需要水平扩容时，应先完成以下改造：
+先用 Mock 模型建立检索与 API 基线，再用真实模型测试端到端延迟。两类数字不能混用。
 
-1. 使用 Redis 保存共享限流计数。
-2. 使用 PostgreSQL 或其他共享数据库保存会话。
-3. 确认模型缓存和知识索引在所有实例间一致。
-4. 在负载均衡器后执行并发与故障转移测试。
+## 监控建议
 
-## 运维建议
+采集 `/v1/metrics` 并至少监控：
 
-- 在反向代理层启用 HTTPS，不直接暴露明文模型 Token。
-- 定期备份 `conversations.db`，备份前确认 SQLite WAL 文件已同步。
-- 监控 429、503、总耗时、模型耗时、检索耗时、Token 用量和视觉降级比例。
-- 更新知识库后同时提交标准化记录、索引文件和通过的检索评测结果。
+- HTTP 429、5xx 与请求时延。
+- Agent 动作、转人工比例和工单创建量。
+- 检索、文本模型和视觉模型时延。
+- 模型重试、熔断拒绝和视觉降级比例。
+- 用户评分数量、平均分和低分占比。
+- 活跃工单与紧急未结工单。
+
+日志应按 `request_id` 聚合，避免记录 API Token、模型密钥、原始 Base64 图片和其他敏感信息。
+
+## 备份与恢复
+
+需要备份命名卷中的：
+
+- `data/runtime/conversations.db` 及其 WAL/SHM 文件。
+- `data/runtime/support.db` 及其 WAL/SHM 文件。
+
+更稳妥的方式是在停止写入或执行 SQLite 在线备份后复制。恢复时保持文件权限属于容器中的 `agent` 用户，并在接流量前验证 `/v1/ready`。
+
+## 反向代理
+
+- 仅通过 HTTPS 暴露服务。
+- 限制请求体大小，且不能小于应用的 `AGENT_MAX_REQUEST_BYTES`。
+- 上游超时应大于模型最大超时与重试总预算。
+- 将 `X-Request-ID` 透传给服务。
+- `/v1/health` 用于 liveness，`/v1/ready` 用于 readiness。
+
+## 单 Worker 与扩容
+
+当前模板固定单 Worker，原因是 SQLite 连接、进程内限流、熔断状态和 Embedding 模型对象均属于单进程。
+
+水平扩容前完成：
+
+1. 会话、工单和反馈迁移到 PostgreSQL 或其他共享数据库。
+2. 限流和熔断状态迁移到 Redis 或网关。
+3. 确保所有实例使用同一知识索引版本。
+4. 在负载均衡器后重新运行并发、重试和故障转移测试。
+
+## 回滚
+
+- 保留上一版本镜像和对应配置。
+- 数据库变更应保持向后兼容；v2 启动时会把旧纳秒时间戳迁移为 Unix 秒。
+- 回滚前备份两个 SQLite 数据库。
+- 回滚后检查服务版本、就绪状态、工单读取和一次 Mock/真实请求。
