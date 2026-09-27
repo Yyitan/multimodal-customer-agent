@@ -1,0 +1,164 @@
+[
+  {
+    "case_id": "safety_smoke",
+    "category": "safety",
+    "question": "设备突然冒烟并有烧焦味，我还能继续使用吗？",
+    "expected_intent": "safety_risk",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "potential_safety_risk"
+  },
+  {
+    "case_id": "safety_electric_shock",
+    "category": "safety",
+    "question": "刚才摸设备时有漏电和触电的感觉，应该怎么办？",
+    "expected_intent": "safety_risk",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "potential_safety_risk"
+  },
+  {
+    "case_id": "safety_injury",
+    "category": "safety",
+    "question": "产品爆炸导致我手部受伤了。",
+    "expected_intent": "safety_risk",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "potential_safety_risk"
+  },
+  {
+    "case_id": "human_direct",
+    "category": "human_handoff",
+    "question": "请帮我转人工客服。",
+    "expected_intent": "human_handoff",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "user_requested_human"
+  },
+  {
+    "case_id": "human_complaint",
+    "category": "human_handoff",
+    "question": "我要投诉，请让客服人员处理。",
+    "expected_intent": "human_handoff",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "user_requested_human"
+  },
+  {
+    "case_id": "business_refund",
+    "category": "business_action",
+    "question": "我的订单要申请退款。",
+    "expected_intent": "business_action",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "business_system_action_required"
+  },
+  {
+    "case_id": "business_invoice",
+    "category": "business_action",
+    "question": "请帮我补开发票并修改抬头。",
+    "expected_intent": "business_action",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "business_system_action_required"
+  },
+  {
+    "case_id": "business_repair",
+    "category": "business_action",
+    "question": "我想预约维修并提交保修申请。",
+    "expected_intent": "business_action",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "business_system_action_required"
+  },
+  {
+    "case_id": "troubleshooting_indicator",
+    "category": "knowledge",
+    "question": "充电器指示灯一直闪烁是什么故障？",
+    "has_evidence": true,
+    "expected_intent": "troubleshooting",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "expected_handoff_reason": null
+  },
+  {
+    "case_id": "troubleshooting_overheat",
+    "category": "knowledge",
+    "question": "电池过热后无法充电应该怎样处理？",
+    "has_evidence": true,
+    "expected_intent": "troubleshooting",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "expected_handoff_reason": null
+  },
+  {
+    "case_id": "guidance_install",
+    "category": "knowledge",
+    "question": "这款设备应该如何安装？",
+    "has_evidence": true,
+    "expected_intent": "product_guidance",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "expected_handoff_reason": null
+  },
+  {
+    "case_id": "guidance_replace_band",
+    "category": "knowledge",
+    "question": "健身追踪器的表带怎么更换？",
+    "has_evidence": true,
+    "expected_intent": "product_guidance",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "expected_handoff_reason": null
+  },
+  {
+    "case_id": "general_specification",
+    "category": "knowledge",
+    "question": "这个型号支持哪些配件？",
+    "has_evidence": true,
+    "expected_intent": "knowledge_question",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "expected_handoff_reason": null
+  },
+  {
+    "case_id": "general_manual_page",
+    "category": "knowledge",
+    "question": "手册里对电池温度有什么说明？",
+    "has_evidence": true,
+    "expected_intent": "knowledge_question",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "expected_handoff_reason": null
+  },
+  {
+    "case_id": "evidence_missing_troubleshooting",
+    "category": "evidence_guardrail",
+    "question": "设备出现未知错误代码，无法正常启动。",
+    "has_evidence": false,
+    "expected_intent": "troubleshooting",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "insufficient_knowledge_evidence"
+  },
+  {
+    "case_id": "evidence_missing_guidance",
+    "category": "evidence_guardrail",
+    "question": "一个没有手册的新配件应该怎么安装？",
+    "has_evidence": false,
+    "expected_intent": "product_guidance",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "insufficient_knowledge_evidence"
+  },
+  {
+    "case_id": "evidence_missing_general",
+    "category": "evidence_guardrail",
+    "question": "请告诉我这个未知型号的保养周期。",
+    "has_evidence": false,
+    "expected_intent": "knowledge_question",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "insufficient_knowledge_evidence"
+  }
+]

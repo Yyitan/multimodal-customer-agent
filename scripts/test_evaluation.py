@@ -6,6 +6,7 @@ from scripts.evaluate_generation import (
     check_keyword_groups,
     failed_case_result,
 )
+from scripts.evaluate_agent import calculate_metrics
 from scripts.evaluate_retrieval import collect_image_ranks
 from scripts.evaluation_support import (
     load_cases,
@@ -34,6 +35,26 @@ def main() -> None:
         [["高温", "过热"], ["暂停"], ["故障"]],
     )
     checks["关键词组支持组内任一匹配"] = missing_groups == [["故障"]]
+
+    policy_metrics = calculate_metrics(
+        [
+            {
+                "checks": {"intent": True, "action": True},
+                "expected": {"handoff_required": True},
+                "actual": {"handoff_required": True},
+            },
+            {
+                "checks": {"intent": False, "action": True},
+                "expected": {"handoff_required": False},
+                "actual": {"handoff_required": False},
+            },
+        ]
+    )
+    checks["Agent评测指标可计算准确率和F1"] = (
+        policy_metrics["intent_accuracy"] == 0.5
+        and policy_metrics["action_accuracy"] == 1.0
+        and policy_metrics["handoff_f1"] == 1.0
+    )
 
     failed_result = failed_case_result(
         {
@@ -78,10 +99,12 @@ def main() -> None:
                 {"case_id": "case-a", "passed": True},
                 {"case_id": "case-b", "passed": False},
             ],
+            summary_fields={"custom_metric": 0.75},
         )
         persisted = json.loads(report_path.read_text(encoding="utf-8"))
         checks["评测报告写入汇总和明细"] = (
             report["summary"]["pass_rate"] == 0.5
+            and report["summary"]["custom_metric"] == 0.75
             and persisted["summary"]["failed_count"] == 1
             and len(persisted["results"]) == 2
         )

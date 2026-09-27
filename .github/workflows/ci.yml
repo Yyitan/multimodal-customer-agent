@@ -41,3 +41,6 @@ jobs:
 
       - name: Run retrieval evaluation
         run: python -m scripts.evaluate_retrieval
+
+      - name: Run agent policy evaluation
+        run: python -m scripts.evaluate_agent

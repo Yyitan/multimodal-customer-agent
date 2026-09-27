@@ -46,19 +46,24 @@ def write_report(
     path: Path,
     evaluation_type: str,
     results: list[dict[str, Any]],
+    summary_fields: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Persist a machine-readable evaluation report."""
     passed_count = sum(bool(result["passed"]) for result in results)
     total_count = len(results)
+    summary = {
+        "total_count": total_count,
+        "passed_count": passed_count,
+        "failed_count": total_count - passed_count,
+        "pass_rate": passed_count / total_count if total_count else 0.0,
+    }
+    if summary_fields:
+        summary.update(summary_fields)
+
     report = {
         "evaluation_type": evaluation_type,
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "summary": {
-            "total_count": total_count,
-            "passed_count": passed_count,
-            "failed_count": total_count - passed_count,
-            "pass_rate": passed_count / total_count if total_count else 0.0,
-        },
+        "summary": summary,
         "results": results,
     }
     path.parent.mkdir(parents=True, exist_ok=True)
