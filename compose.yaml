@@ -7,6 +7,7 @@ services:
     environment:
       AGENT_ENVIRONMENT: production
       AGENT_CONVERSATION_DB_PATH: data/runtime/conversations.db
+      AGENT_SUPPORT_DB_PATH: data/runtime/support.db
       AGENT_PRELOAD_EMBEDDING_MODEL: "true"
     ports:
       - "8000:8000"

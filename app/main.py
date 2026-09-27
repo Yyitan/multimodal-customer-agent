@@ -59,6 +59,7 @@ from app.request_control import (
 from app.observability import MetricsMiddleware, MetricsRegistry
 from app.knowledge_images import IMAGE_ID_PATTERN, KnowledgeImageCatalog
 from app.support_store import SupportStore
+from app.version import API_PREFIX, APP_NAME, APP_VERSION, CAPABILITIES
 
 # 增加结构化日志（区分日志等级、写入文件、记录时间、记录异常堆栈，适合后端服务。）
 import logging
@@ -247,6 +248,13 @@ class OperationsSummaryResponse(BaseModel):
     rating_counts: dict[str, int]
 
 
+class ServiceInfoResponse(BaseModel):
+    name: str
+    version: str
+    api_prefix: str
+    capabilities: list[str]
+
+
 # 规定真正业务结果的格式
 class ChatData(BaseModel):
     """Business data nested inside the API response."""
@@ -399,7 +407,7 @@ logger = logging.getLogger(__name__)
 # 创建一个名为app的Web服务对象:FatAPI会自动读取这些信息,在http://127.0.0.1:8000/docs 生成可交互的接口文档
 app = FastAPI(
     title="Multimodal Customer Service Agent",
-    version="1.0.0",
+    version=APP_VERSION,
     description=("Multimodal customer-service API " "with hybrid knowledge retrieval"),
     lifespan=lifespan,
 )
@@ -422,6 +430,17 @@ app.add_middleware(MetricsMiddleware, registry=metrics_registry)
 def web_console() -> FileResponse:
     """Serve the customer-service operations console."""
     return FileResponse(web_dir / "index.html")
+
+
+@app.get("/v1/info", tags=["system"], response_model=ServiceInfoResponse)
+def service_info() -> ServiceInfoResponse:
+    """Expose stable release metadata for clients and deployment checks."""
+    return ServiceInfoResponse(
+        name=APP_NAME,
+        version=APP_VERSION,
+        api_prefix=API_PREFIX,
+        capabilities=list(CAPABILITIES),
+    )
 
 
 # 当有人用 GET 请求访问 /health 时，执行下一行定义的 health_check 函数

@@ -96,6 +96,13 @@ def main() -> None:
     checks["v1健康检查可用"] = (
         client.get("/v1/health").json() == {"status": "ok"}
     )
+    info_response = client.get("/v1/info")
+    checks["服务信息接口暴露版本和能力"] = (
+        info_response.status_code == 200
+        and info_response.json()["version"] == "2.0.0"
+        and "agent_routing" in info_response.json()["capabilities"]
+        and "human_handoff" in info_response.json()["capabilities"]
+    )
     # 请求参数校验（Pydantic 校验）
     empty_question_response = client.post(
         "/chat",
