@@ -22,12 +22,14 @@ from fastapi import (
     Response,
 )
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 # 用来规定接口JSON的格式，并自动检查用户传的数据是否合格
 # `field_validator`：Pydantic 的字段校验装饰器，
 from pydantic import BaseModel, Field, field_validator
 
 from app.config import (
+    PROJECT_ROOT,
     get_settings,
     validate_runtime_settings,
 )
@@ -392,6 +394,12 @@ app = FastAPI(
     description=("Multimodal customer-service API " "with hybrid knowledge retrieval"),
     lifespan=lifespan,
 )
+web_dir = PROJECT_ROOT / "app" / "web"
+app.mount(
+    "/assets",
+    StaticFiles(directory=web_dir / "assets"),
+    name="assets",
+)
 app.add_middleware(
     RequestBodyLimitMiddleware,
     max_body_bytes=settings.max_request_bytes,
@@ -399,6 +407,12 @@ app.add_middleware(
 )
 app.add_middleware(RequestIdMiddleware)
 app.add_middleware(MetricsMiddleware, registry=metrics_registry)
+
+
+@app.get("/", include_in_schema=False, response_class=FileResponse)
+def web_console() -> FileResponse:
+    """Serve the customer-service operations console."""
+    return FileResponse(web_dir / "index.html")
 
 
 # 当有人用 GET 请求访问 /health 时，执行下一行定义的 health_check 函数

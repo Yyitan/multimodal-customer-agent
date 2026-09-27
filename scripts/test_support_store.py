@@ -22,6 +22,7 @@ def main() -> None:
             ticket["ticket_id"].startswith("ticket_")
             and ticket["status"] == "open"
             and ticket["priority"] == "high"
+            and 1_000_000_000 < ticket["created_at"] < 10_000_000_000
         )
 
         duplicate = store.create_ticket(

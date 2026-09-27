@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 from threading import RLock
-from time import time_ns
+from time import time
 from typing import Any
 from uuid import uuid4
 
@@ -75,6 +75,24 @@ class SupportStore:
                 ON customer_feedback(session_id, created_at DESC)
                 """
             )
+            # v2 之前使用纳秒时间戳。API 对外统一使用 Unix 秒，启动时
+            # 自动迁移旧数据库，避免前端和第三方客户端自行猜测单位。
+            self._connection.execute(
+                """
+                UPDATE support_tickets
+                SET created_at = created_at / 1000000000,
+                    updated_at = updated_at / 1000000000
+                WHERE created_at > 1000000000000
+                   OR updated_at > 1000000000000
+                """
+            )
+            self._connection.execute(
+                """
+                UPDATE customer_feedback
+                SET created_at = created_at / 1000000000
+                WHERE created_at > 1000000000000
+                """
+            )
 
     @staticmethod
     def _row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
@@ -100,7 +118,7 @@ class SupportStore:
             if existing is not None:
                 return dict(existing)
 
-            now = time_ns()
+            now = int(time())
             ticket_id = f"ticket_{uuid4().hex[:16]}"
             self._connection.execute(
                 """
@@ -176,7 +194,7 @@ class SupportStore:
                 SET status = ?, updated_at = ?
                 WHERE ticket_id = ?
                 """,
-                (status, time_ns(), ticket_id),
+                (status, int(time()), ticket_id),
             )
             if cursor.rowcount == 0:
                 return None
@@ -210,7 +228,7 @@ class SupportStore:
                     request_id,
                     rating,
                     comment.strip(),
-                    time_ns(),
+                    int(time()),
                 ),
             )
             row = self._connection.execute(
