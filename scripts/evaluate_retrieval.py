@@ -56,6 +56,7 @@ def evaluate_case(
     missing_image_ids = expected_image_ids - returned_image_ids
     found_ranks = [image_ranks[image_id] for image_id in found_image_ids]
     passed = found_image_ids == expected_image_ids and product_consistent
+    known_failure = bool(case.get("known_failure", False))
 
     return {
         "case_id": case["case_id"],
@@ -72,6 +73,7 @@ def evaluate_case(
         "wrong_product_chunk_ids": [
             record["chunk_id"] for record in wrong_product_records
         ],
+        "known_failure": known_failure,
         "passed": passed,
     }
 
@@ -126,6 +128,16 @@ def main() -> None:
         args.output,
         evaluation_type="retrieval",
         results=results,
+        summary_fields={
+            "known_failure_count": sum(
+                1 for result in results if result["known_failure"]
+            ),
+            "known_failure_passed_count": sum(
+                1
+                for result in results
+                if result["known_failure"] and result["passed"]
+            ),
+        },
     )
     summary = report["summary"]
     print("\n" + "=" * 60)
@@ -133,9 +145,28 @@ def main() -> None:
     print("案例总数：", summary["total_count"])
     print("通过案例数：", summary["passed_count"])
     print("通过率：", f"{summary['pass_rate']:.2%}")
+    print("已知失败案例（不阻断）：", summary["known_failure_count"])
+    if summary["known_failure_passed_count"]:
+        print(
+            "警告：已知失败案例通过了，应移除 known_failure 标记转正：",
+            [
+                result["case_id"]
+                for result in results
+                if result["known_failure"] and result["passed"]
+            ],
+        )
     print("报告路径：", args.output)
 
-    if summary["failed_count"]:
+    unexpected_failures = [
+        result
+        for result in results
+        if not result["passed"] and not result["known_failure"]
+    ]
+    if unexpected_failures:
+        print(
+            "意外失败案例：",
+            [result["case_id"] for result in unexpected_failures],
+        )
         raise SystemExit(1)
 
 
