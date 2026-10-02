@@ -8,6 +8,7 @@ os.environ["AGENT_SUPPORT_DB_PATH"] = ":memory:"
 
 from app.llm_client import LLMClientError
 from app.main import app, conversation_store, support_store
+from app.version import APP_VERSION
 
 """FastAPI 接口层的集成测试脚本"""
 
@@ -99,7 +100,7 @@ def main() -> None:
     info_response = client.get("/v1/info")
     checks["服务信息接口暴露版本和能力"] = (
         info_response.status_code == 200
-        and info_response.json()["version"] == "2.0.0"
+        and info_response.json()["version"] == APP_VERSION
         and "agent_routing" in info_response.json()["capabilities"]
         and "human_handoff" in info_response.json()["capabilities"]
     )
