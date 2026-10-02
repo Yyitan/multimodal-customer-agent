@@ -81,6 +81,12 @@ class Settings(BaseSettings):
     
     # `disabled`：关闭深度思考智谱。 GLM-4.5 的深度思考（thinking）就是模型内部的推理链，开启会消耗更多 token，推理更慢
     llm_thinking:Literal["enabled","disabled"]|None="disabled"
+
+    # Agent 路由模式：
+    # rules  = 确定性关键词规则路由（默认，零成本零延迟，可解释）
+    # llm    = 大模型 function-calling 自主决策（泛化好，但每请求多一次模型调用）
+    # hybrid = 安全/业务/转人工硬规则先做护栏直接短路，其余问题交给大模型决策
+    routing_mode: Literal["rules", "llm", "hybrid"] = "rules"
     # 默认最多选 3 张图片，大于等于1，小于等于5
     max_answer_images:int=Field(default=3,ge=1,le=5)
     

@@ -37,6 +37,10 @@ from app.agent_policy import (
     classify_request,
     review_evidence,
 )
+from app.llm_router import (
+    needs_llm_routing,
+    route_with_llm,
+)
 from app.input_security import (
     ImageValidationError,
     RequestBodyLimitMiddleware,
@@ -728,11 +732,76 @@ def chat(
     conversation_history = conversation_store.get_history(
         session_id
     )
+
+    # ==== Agent 路由（三档模式，见 AGENT_ROUTING_MODE）====
+    # rules  ：确定性关键词规则
+    # llm    ：大模型 function-calling 决策
+    # hybrid ：安全/业务/转人工硬规则先短路作护栏，其余交给大模型
     agent_decision = classify_request(request.question)
+    routed_by = "rules"
+    if settings.routing_mode in ("llm", "hybrid"):
+        if settings.routing_mode == "hybrid" and not needs_llm_routing(
+            agent_decision
+        ):
+            routed_by = "rules_guardrail"
+        else:
+            try:
+                routing_result = route_with_llm(
+                    request.question,
+                    settings,
+                )
+                agent_decision = routing_result["decision"]
+                routed_by = "llm"
+            except Exception as routing_error:
+                # 路由模型失败不阻断服务：回退确定性规则
+                metrics_registry.increment(
+                    "routing_llm_fallback_total",
+                    mode=settings.routing_mode,
+                )
+                logger.warning(
+                    "llm_routing_failed fallback_to_rules mode=%s error=%s",
+                    settings.routing_mode,
+                    routing_error,
+                )
+                agent_decision = classify_request(request.question)
+                routed_by = "rules_fallback"
+    metrics_registry.increment(
+        "routing_total",
+        mode=settings.routing_mode,
+        routed_by=routed_by,
+    )
+    logger.info(
+        "routing_decision mode=%s routed_by=%s intent=%s action=%s handoff=%s",
+        settings.routing_mode,
+        routed_by,
+        agent_decision.intent,
+        agent_decision.action,
+        agent_decision.handoff_required,
+    )
 
     if agent_decision.handoff_required:
         service_result = {
             "answer": agent_decision.response_message or "需要人工客服处理。",
+            "references": [],
+            "image_ids": [],
+            "metrics": build_metrics(
+                settings=settings,
+                retrieval_latency_ms=0,
+                total_latency_ms=0,
+                retrieved_record_count=0,
+                context_record_count=0,
+                context_length=0,
+                llm_result=None,
+                input_image_count=len(request.images),
+            ),
+        }
+    elif agent_decision.action == "ask_clarification":
+        # LLM 路由判定信息严重不足：不检索不生成，直接向用户追问
+        service_result = {
+            "answer": (
+                agent_decision.response_message
+                or "为了更准确地帮您解决问题，请补充问题的详细信息。"
+            ),
             "references": [],
             "image_ids": [],
             "metrics": build_metrics(
