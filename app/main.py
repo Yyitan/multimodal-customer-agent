@@ -1,7 +1,9 @@
 """FastAPI entry point for the knowledge-based customer-service agent."""
 
 # 增加结构化日志（区分日志等级、写入文件、记录时间、记录异常堆栈，适合后端服务。）
+import json
 import logging
+import re
 from contextlib import asynccontextmanager
 
 # 生成返回时间戳
@@ -25,7 +27,7 @@ from fastapi import (
 from fastapi import (
     Path as PathParameter,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 # 用来规定接口JSON的格式，并自动检查用户传的数据是否合格
@@ -705,6 +707,65 @@ def get_knowledge_image(
         headers={"Cache-Control": "private, max-age=3600"},
     )
 
+def _route_request(question: str) -> tuple[Any, str]:
+    """三档 Agent 路由（rules/llm/hybrid），chat 与 chat/stream 共用。
+
+    返回 (AgentDecision, routed_by)。routed_by 取值：
+    rules / rules_guardrail / llm / rules_fallback。
+    """
+    # ==== Agent 路由（三档模式，见 AGENT_ROUTING_MODE）====
+    # rules  ：确定性关键词规则
+    # llm    ：大模型 function-calling 决策
+    # hybrid ：安全/业务/转人工硬规则先短路作护栏，其余交给大模型
+    agent_decision = classify_request(question)
+    routed_by = "rules"
+    if settings.routing_mode in ("llm", "hybrid"):
+        if settings.routing_mode == "hybrid" and not needs_llm_routing(
+            agent_decision
+        ):
+            routed_by = "rules_guardrail"
+        else:
+            try:
+                routing_result = route_with_llm(
+                    question,
+                    settings,
+                )
+                agent_decision = routing_result["decision"]
+                routed_by = "llm"
+            except Exception as routing_error:
+                # 路由模型失败不阻断服务：回退确定性规则
+                metrics_registry.increment(
+                    "routing_llm_fallback_total",
+                    mode=settings.routing_mode,
+                )
+                logger.warning(
+                    "llm_routing_failed fallback_to_rules mode=%s error=%s",
+                    settings.routing_mode,
+                    routing_error,
+                )
+                agent_decision = classify_request(question)
+                routed_by = "rules_fallback"
+    metrics_registry.increment(
+        "routing_total",
+        mode=settings.routing_mode,
+        routed_by=routed_by,
+    )
+    logger.info(
+        "routing_decision mode=%s routed_by=%s intent=%s action=%s handoff=%s",
+        settings.routing_mode,
+        routed_by,
+        agent_decision.intent,
+        agent_decision.action,
+        agent_decision.handoff_required,
+    )
+    return agent_decision, routed_by
+
+
+def _sse(event: str, data: dict[str, Any]) -> str:
+    """编码一条 SSE 事件（JSON 载荷，中文不转义）。"""
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
 # 当外部程序向 /chat 发送一个 POST 请求时，交给下面的 chat 函数处理；并且返回结果必须符合 ChatResponse 的格式
 @app.post(
     "/chat",
@@ -737,51 +798,7 @@ def chat(
         session_id
     )
 
-    # ==== Agent 路由（三档模式，见 AGENT_ROUTING_MODE）====
-    # rules  ：确定性关键词规则
-    # llm    ：大模型 function-calling 决策
-    # hybrid ：安全/业务/转人工硬规则先短路作护栏，其余交给大模型
-    agent_decision = classify_request(request.question)
-    routed_by = "rules"
-    if settings.routing_mode in ("llm", "hybrid"):
-        if settings.routing_mode == "hybrid" and not needs_llm_routing(
-            agent_decision
-        ):
-            routed_by = "rules_guardrail"
-        else:
-            try:
-                routing_result = route_with_llm(
-                    request.question,
-                    settings,
-                )
-                agent_decision = routing_result["decision"]
-                routed_by = "llm"
-            except Exception as routing_error:
-                # 路由模型失败不阻断服务：回退确定性规则
-                metrics_registry.increment(
-                    "routing_llm_fallback_total",
-                    mode=settings.routing_mode,
-                )
-                logger.warning(
-                    "llm_routing_failed fallback_to_rules mode=%s error=%s",
-                    settings.routing_mode,
-                    routing_error,
-                )
-                agent_decision = classify_request(request.question)
-                routed_by = "rules_fallback"
-    metrics_registry.increment(
-        "routing_total",
-        mode=settings.routing_mode,
-        routed_by=routed_by,
-    )
-    logger.info(
-        "routing_decision mode=%s routed_by=%s intent=%s action=%s handoff=%s",
-        settings.routing_mode,
-        routed_by,
-        agent_decision.intent,
-        agent_decision.action,
-        agent_decision.handoff_required,
-    )
+    agent_decision, routed_by = _route_request(request.question)
 
     if agent_decision.handoff_required:
         service_result = {
@@ -1020,4 +1037,223 @@ def chat(
                 **service_result["metrics"]
             ),
         )
+    )
+
+
+@app.post(
+    "/v1/chat/stream",
+    tags=["agent"],
+    dependencies=[
+        Depends(verify_api_token),
+        Depends(enforce_rate_limit),
+    ],
+)
+def chat_stream(
+    request: ChatRequest,
+    http_request: Request,
+) -> StreamingResponse:
+    """SSE 流式对话：routing -> (references -> delta*) -> done 事件序列。
+
+    说明：当前答案按句子切分推送（阶段级流式），token 级流式需要
+    重构生成层的 JSON 输出契约，列入后续版本。事件语义：
+    - routing     路由决策（intent/action/routed_by）
+    - ticket      已创建人工工单（此后无 references/delta）
+    - message     追问文案（ask_clarification 路由）
+    - references  检索依据与候选图片（知识类回答）
+    - delta       答案增量文本
+    - done        终态载荷（含完整 metrics；error 时携带错误信息）
+    """
+    session_id = request.session_id or f"kf_session_{uuid4().hex[:12]}"
+    conversation_history = conversation_store.get_history(session_id)
+    agent_decision, routed_by = _route_request(request.question)
+
+    def event_stream():
+        # 证据复核会在闭包内重绑定路由决策，需声明引用外层变量
+        nonlocal agent_decision
+        yield _sse(
+            "routing",
+            {
+                "intent": agent_decision.intent,
+                "action": agent_decision.action,
+                "routed_by": routed_by,
+                "session_id": session_id,
+            },
+        )
+
+        service_result: dict[str, Any]
+        if agent_decision.handoff_required:
+            service_result = {
+                "answer": agent_decision.response_message
+                or "需要人工客服处理。",
+                "references": [],
+                "image_ids": [],
+                "metrics": build_metrics(
+                    settings=settings,
+                    retrieval_latency_ms=0,
+                    total_latency_ms=0,
+                    retrieved_record_count=0,
+                    context_record_count=0,
+                    context_length=0,
+                    llm_result=None,
+                    input_image_count=len(request.images),
+                ),
+            }
+        elif agent_decision.action == "ask_clarification":
+            service_result = {
+                "answer": (
+                    agent_decision.response_message
+                    or "为了更准确地帮您解决问题，请补充问题的详细信息。"
+                ),
+                "references": [],
+                "image_ids": [],
+                "metrics": build_metrics(
+                    settings=settings,
+                    retrieval_latency_ms=0,
+                    total_latency_ms=0,
+                    retrieved_record_count=0,
+                    context_record_count=0,
+                    context_length=0,
+                    llm_result=None,
+                    input_image_count=len(request.images),
+                ),
+            }
+        else:
+            try:
+                service_result = answer_question(
+                    request.question,
+                    images=request.images,
+                    conversation_history=conversation_history,
+                )
+            except LLMClientError as error:
+                metrics_registry.increment(
+                    "llm_errors_total",
+                    provider=settings.llm_provider,
+                    category=error.category,
+                )
+                logger.exception(
+                    "chat_stream_failed request_id=%s session_id=%s category=%s",
+                    http_request.state.request_id,
+                    session_id,
+                    error.category,
+                )
+                yield _sse(
+                    "done",
+                    {
+                        "status": "error",
+                        "error": str(error),
+                        "retryable": error.retryable,
+                    },
+                )
+                return
+
+            if agent_decision.action == "search_knowledge":
+                agent_decision = review_evidence(
+                    agent_decision,
+                    service_result,
+                )
+                if agent_decision.handoff_required:
+                    service_result["answer"] = (
+                        agent_decision.response_message
+                        or service_result["answer"]
+                    )
+
+        ticket_id: str | None = None
+        if agent_decision.handoff_required:
+            priority = (
+                "urgent"
+                if agent_decision.intent == "safety_risk"
+                else "high"
+                if agent_decision.intent == "business_action"
+                else "normal"
+            )
+            ticket = support_store.create_ticket(
+                session_id=session_id,
+                request_id=http_request.state.request_id,
+                question=request.question,
+                reason=agent_decision.handoff_reason or "human_review_required",
+                priority=priority,
+            )
+            ticket_id = str(ticket["ticket_id"])
+            metrics_registry.increment(
+                "support_tickets_created_total",
+                priority=priority,
+                reason=agent_decision.handoff_reason or "human_review_required",
+            )
+            service_result["answer"] = (
+                f"{service_result['answer']} 已创建人工服务工单，编号：{ticket_id}。"
+            )
+            yield _sse(
+                "ticket",
+                {"ticket_id": ticket_id, "priority": priority},
+            )
+
+        if agent_decision.action == "ask_clarification" and not ticket_id:
+            yield _sse("message", {"text": service_result["answer"]})
+
+        if service_result["references"]:
+            yield _sse(
+                "references",
+                {
+                    "references": [
+                        {
+                            "chunk_id": record["chunk_id"],
+                            "product": record["product"],
+                            "text": record["text"],
+                        }
+                        for record in service_result["references"][:5]
+                    ],
+                    "image_ids": service_result["image_ids"],
+                },
+            )
+
+        # 答案按句子切分推送（阶段级流式）；工单/追问文案一次性推送
+        answer = service_result["answer"]
+        if agent_decision.handoff_required or agent_decision.action in (
+            "ask_clarification",
+        ):
+            yield _sse("delta", {"text": answer})
+        else:
+            for part in re.split(r"(?<=[。！？；!?;\n])", answer):
+                if part.strip():
+                    yield _sse("delta", {"text": part})
+
+        metrics = service_result["metrics"]
+        metrics_registry.increment(
+            "agent_chat_requests_total",
+            intent=agent_decision.intent,
+            action=agent_decision.action,
+            handoff=str(agent_decision.handoff_required).lower(),
+        )
+        yield _sse(
+            "done",
+            {
+                "status": "ok",
+                "session_id": session_id,
+                "request_id": http_request.state.request_id,
+                "answer": answer,
+                "image_ids": service_result["image_ids"],
+                "images": [
+                    {
+                        "image_id": image_id,
+                        "url": f"/v1/knowledge-images/{image_id}",
+                    }
+                    for image_id in service_result["image_ids"]
+                    if knowledge_image_catalog.available(image_id)
+                ],
+                "agent": {
+                    "intent": agent_decision.intent,
+                    "action": agent_decision.action,
+                    "confidence": agent_decision.confidence,
+                    "handoff_required": agent_decision.handoff_required,
+                    "handoff_reason": agent_decision.handoff_reason,
+                    "ticket_id": ticket_id,
+                },
+                "metrics": metrics,
+            },
+        )
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

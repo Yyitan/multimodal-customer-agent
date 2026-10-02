@@ -21,6 +21,7 @@ def load_tests(
     from scripts.test_api import main as test_api
     from scripts.test_auth import main as test_auth
     from scripts.test_benchmark import main as test_benchmark
+    from scripts.test_chat_stream import main as test_chat_stream
     from scripts.test_conversation import main as test_conversation
     from scripts.test_evaluation import main as test_evaluation
     from scripts.test_image_ranking import (
@@ -74,6 +75,7 @@ def load_tests(
         ("请求控制测试", test_request_control),
         ("LLM路由测试", test_llm_router),
         ("查询改写测试", test_query_rewriter),
+        ("SSE流式对话测试", test_chat_stream),
         ("客服闭环存储测试", test_support_store),
         ("产品置信度测试", test_product_confidence),
         ("产品策略业务链测试", test_product_strategy_chain),
