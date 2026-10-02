@@ -87,6 +87,10 @@ class Settings(BaseSettings):
     # llm    = 大模型 function-calling 自主决策（泛化好，但每请求多一次模型调用）
     # hybrid = 安全/业务/转人工硬规则先做护栏直接短路，其余问题交给大模型决策
     routing_mode: Literal["rules", "llm", "hybrid"] = "rules"
+
+    # 多轮对话检索改写开关：开启后有历史上下文的追问会先由大模型改写成
+    # 可独立检索的完整问题再送检索；关闭则保持"历史原文拼接"的旧行为。
+    query_rewrite_enabled: bool = False
     # 默认最多选 3 张图片，大于等于1，小于等于5
     max_answer_images:int=Field(default=3,ge=1,le=5)
     

@@ -6,6 +6,7 @@ from app.context_builder import build_context_package
 from app.hybrid_retriever import hybrid_search
 from app.llm_client import LLMClientError, LLMResult, generate_answer
 from app.prompt_builder import build_prompt_package
+from app.query_rewriter import rewrite_query_with_history
 from app.vision_analyzer import (
     analyze_images_for_retrieval,
     build_multimodal_retrieval_query,
@@ -159,10 +160,31 @@ def answer_question(
     pipeline_started_at = perf_counter()
 
     current_history=conversation_history or []
-    retrieval_query = build_history_aware_retrieval_query(
-        question,
-        current_history,
-    )
+
+    # 检索查询构造：开启改写且有历史时，让大模型把追问还原成
+    # 可独立检索的完整问题；失败或未开启时回退历史原文拼接。
+    # 改写器自身在 mock provider 下抛错，走统一的失败回退路径。
+    rewrite_meta: dict[str, Any] | None = None
+    if current_settings.query_rewrite_enabled and current_history:
+        try:
+            rewrite_meta = rewrite_query_with_history(
+                question,
+                current_history,
+                current_settings,
+            )
+            retrieval_query = rewrite_meta["query"]
+        except Exception as error:
+            logger.warning(
+                "query_rewrite_failed fallback_to_concat error=%s",
+                error,
+            )
+            rewrite_meta = None
+
+    if rewrite_meta is None:
+        retrieval_query = build_history_aware_retrieval_query(
+            question,
+            current_history,
+        )
     # 保存视觉预分析结果，便于后面记录指标或调试。
     vision_analysis = None
 
@@ -217,11 +239,31 @@ def answer_question(
                     product_strategy["include_product_hint"]
                 ),
             )
-            # 再把对话历史拼进去，得到最终用于向量检索的retrieval_query
-            retrieval_query = build_history_aware_retrieval_query(
-                multimodal_query,
-                current_history,
-            )
+            # 再构造最终用于向量检索的retrieval_query：
+            # 开启改写时对多模态查询同样先做指代消解，否则回退拼接
+            if current_settings.query_rewrite_enabled and current_history:
+                try:
+                    rewrite_meta = rewrite_query_with_history(
+                        multimodal_query,
+                        current_history,
+                        current_settings,
+                    )
+                    retrieval_query = rewrite_meta["query"]
+                except Exception as error:
+                    logger.warning(
+                        "query_rewrite_failed_multimodal fallback_to_concat error=%s",
+                        error,
+                    )
+                    rewrite_meta = None
+                    retrieval_query = build_history_aware_retrieval_query(
+                        multimodal_query,
+                        current_history,
+                    )
+            else:
+                retrieval_query = build_history_aware_retrieval_query(
+                    multimodal_query,
+                    current_history,
+                )
 
             # 取出偏好产品，传给hybrid_search做软加分（soft_boost场景生效）
             preferred_product = product_strategy["preferred_product"]
@@ -325,23 +367,32 @@ def answer_question(
     # 计算整条流水线总耗时
     total_latency_ms = round((perf_counter() - pipeline_started_at) * 1000)
 
+    result_metrics = build_metrics(
+        settings=current_settings,
+        retrieval_latency_ms=retrieval_latency_ms,
+        total_latency_ms=total_latency_ms,
+        retrieved_record_count=len(retrieved_records),
+        context_record_count=context_package["record_count"],
+        context_length=context_package["context_length"],
+        llm_result=llm_result,
+        vision_analysis=vision_analysis,
+        input_image_count=len(current_images),
+    )
+    # 检索查询改写观测字段：是否启用改写、改写消耗
+    result_metrics["query_rewrite_used"] = rewrite_meta is not None
+    if rewrite_meta is not None:
+        result_metrics["query_rewrite_tokens"] = rewrite_meta.get("total_tokens")
+        result_metrics["query_rewrite_latency_ms"] = rewrite_meta.get(
+            "latency_ms"
+        )
+
     # 函数最终返回结构化字典。
     return {
         "answer": llm_result.answer,
         "references": context_package["records"],
         # 模型结合问题和资料选择的最终图片，最多3张
         "image_ids": llm_result.image_ids,
-        "metrics": build_metrics(
-            settings=current_settings,
-            retrieval_latency_ms=retrieval_latency_ms,
-            total_latency_ms=total_latency_ms,
-            retrieved_record_count=len(retrieved_records),
-            context_record_count=context_package["record_count"],
-            context_length=context_package["context_length"],
-            llm_result=llm_result,
-            vision_analysis=vision_analysis,
-            input_image_count=len(current_images),
-        ),
+        "metrics": result_metrics,
     }
 
 

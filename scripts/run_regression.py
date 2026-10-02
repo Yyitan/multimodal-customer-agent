@@ -48,6 +48,7 @@ def load_tests(
         main as test_request_control,
     )
     from scripts.test_llm_router import main as test_llm_router
+    from scripts.test_query_rewriter import main as test_query_rewriter
     from scripts.test_support_store import main as test_support_store
     from scripts.test_vision_fallback import (
         main as test_vision_fallback,
@@ -72,6 +73,7 @@ def load_tests(
         ("运行就绪测试", test_readiness),
         ("请求控制测试", test_request_control),
         ("LLM路由测试", test_llm_router),
+        ("查询改写测试", test_query_rewriter),
         ("客服闭环存储测试", test_support_store),
         ("产品置信度测试", test_product_confidence),
         ("产品策略业务链测试", test_product_strategy_chain),

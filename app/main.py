@@ -184,6 +184,9 @@ class ChatMetrics(BaseModel):
     llm_attempt_count: int = 0
     llm_retry_count: int = 0
     llm_circuit_state: str = "not_called"
+    query_rewrite_used: bool = False
+    query_rewrite_tokens: int | None = None
+    query_rewrite_latency_ms: int | None = None
 
 
 class KnowledgeImage(BaseModel):
