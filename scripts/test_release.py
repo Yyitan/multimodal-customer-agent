@@ -3,7 +3,6 @@ from pathlib import Path
 from app.main import app
 from app.version import APP_VERSION
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 

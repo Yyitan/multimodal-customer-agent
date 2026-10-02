@@ -229,7 +229,7 @@ def main() -> None:
         file.write("\n")
 
     header = (
-        f"| 配置 | 图片Recall@10 | 图片Recall@20 | MRR | 产品一致性 | 平均延迟ms |"
+        "| 配置 | 图片Recall@10 | 图片Recall@20 | MRR | 产品一致性 | 平均延迟ms |"
     )
     print(header)
     print("| --- | ---: | ---: | ---: | ---: | ---: |")

@@ -10,7 +10,6 @@ from scripts.evaluation_support import (
     write_report,
 )
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CASES_PATH = PROJECT_ROOT / "data" / "evaluation" / "retrieval_cases.json"
 DEFAULT_REPORT_PATH = (

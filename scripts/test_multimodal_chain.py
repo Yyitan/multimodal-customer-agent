@@ -1,9 +1,8 @@
-from pathlib import Path
-
 import base64
 
 # Python内置正则表达式（regular expression）库,用一段规则（正则表达式）在文本里批量查找、匹配符合特定格式的字符串
 import re
+from pathlib import Path
 
 from app.services.chat_service import answer_question
 

@@ -1,10 +1,12 @@
-from unittest.mock import patch
 from math import isclose
+from unittest.mock import patch
+
 from app.hybrid_retriever import build_candidates
 from app.vision_analyzer import (
     choose_product_retrieval_strategy,
     normalize_product_confidence,
 )
+
 
 def main() -> None:
     product = "健身追踪器"

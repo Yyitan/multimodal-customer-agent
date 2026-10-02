@@ -3,7 +3,6 @@ from threading import RLock
 from time import perf_counter
 from typing import Any
 
-
 LabelTuple = tuple[tuple[str, str], ...]
 
 

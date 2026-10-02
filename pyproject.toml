@@ -1,0 +1,35 @@
+[project]
+name = "multimodal-customer-agent"
+version = "3.0.0"
+description = "可运行、可评测、可部署的中文多模态客服 Agent"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [
+    ".venv*",
+    "artifacts",
+    "data",
+    "tmp",
+]
+
+[tool.ruff.lint]
+# 默认规则(E4/E7/E9/F)之外补充:未使用导入、导入排序等低噪音规则
+select = [
+    "E4",   # import 相关
+    "E7",   # 语句相关
+    "E9",   # 运行时错误级
+    "F",    # pyflakes(未使用变量/导入、未定义名)
+    "I",    # isort 导入排序
+    "B",    # bugbear 常见陷阱
+]
+ignore = [
+    "E741", # l/1 混淆变量名(现有代码少量使用)
+]
+
+[tool.pytest.ini_options]
+testpaths = ["test_scripts.py"]
+addopts = "-q"

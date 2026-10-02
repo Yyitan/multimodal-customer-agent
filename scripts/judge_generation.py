@@ -19,8 +19,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from app.config import get_settings
 from openai import OpenAI
+
+from app.config import get_settings
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_REPORT_PATH = PROJECT_ROOT / "artifacts" / "evaluation" / "generation.json"

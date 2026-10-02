@@ -10,7 +10,6 @@ from typing import Any
 
 import httpx
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_REPORT_PATH = PROJECT_ROOT / "artifacts" / "benchmark" / "api.json"
 

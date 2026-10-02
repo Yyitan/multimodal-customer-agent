@@ -3,6 +3,7 @@ from typing import Any
 
 from app.hybrid_retriever import hybrid_search
 
+
 def clean_text(text:str)->str:
     """清理连续空行和每行两端的空白。"""
     cleaned_lines=[]

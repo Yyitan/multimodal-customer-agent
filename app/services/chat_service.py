@@ -1,8 +1,13 @@
-from typing import Any
+import logging
 from time import perf_counter
+from typing import Any
 
 from app.config import Settings, get_settings
 from app.context_builder import build_context_package
+from app.conversation_store import (
+    ConversationTurn,
+    format_conversation_history,
+)
 from app.hybrid_retriever import hybrid_search
 from app.llm_client import LLMClientError, LLMResult, generate_answer
 from app.prompt_builder import build_prompt_package
@@ -12,11 +17,6 @@ from app.vision_analyzer import (
     build_multimodal_retrieval_query,
     choose_product_retrieval_strategy,
 )
-from app.conversation_store import (
-    ConversationTurn,
-    format_conversation_history,
-)
-import logging
 
 logger = logging.getLogger(__name__)
 

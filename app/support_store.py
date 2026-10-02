@@ -5,7 +5,6 @@ from time import time
 from typing import Any
 from uuid import uuid4
 
-
 TICKET_STATUSES = frozenset({"open", "in_progress", "resolved", "closed"})
 TICKET_PRIORITIES = frozenset({"normal", "high", "urgent"})
 

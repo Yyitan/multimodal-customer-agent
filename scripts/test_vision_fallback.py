@@ -1,7 +1,9 @@
 # Python 内置 mock 工具。作用：拦截替换项目里任意一个函数。可以让被拦截的函数：返回你指定的假数据（return_value）；直接抛出异常（side_effect=异常）
 from unittest.mock import patch
-from app.llm_client import LLMClientError,LLMResult
+
+from app.llm_client import LLMClientError, LLMResult
 from app.services.chat_service import answer_question
+
 
 # 视觉预分析接口：验证能不能触发降级逻辑
 def main()->None:

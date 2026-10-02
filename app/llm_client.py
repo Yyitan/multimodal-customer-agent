@@ -1,8 +1,14 @@
 # lru_cache：缓存装饰器，缓存OpenAI 客户端实例，避免反复新建连接
-from functools import lru_cache
-from typing import Any
 import json
 import re
+
+# 数据类装饰器，用来专门存放数据的类
+from dataclasses import dataclass
+from functools import lru_cache
+
+# 高精度计时器，专门用来测代码执行耗时
+from time import perf_counter
+from typing import Any
 
 # OpenAI SDK 内置异常类，用来捕获不同类型的接口报错
 from openai import (
@@ -12,6 +18,7 @@ from openai import (
     OpenAI,
     RateLimitError,
 )
+
 from app.config import Settings
 from app.model_resilience import (
     CircuitOpenError,
@@ -19,12 +26,6 @@ from app.model_resilience import (
     execute_with_resilience,
 )
 from app.prompt_builder import mock_generate_answer
-
-# 数据类装饰器，用来专门存放数据的类
-from dataclasses import dataclass
-
-# 高精度计时器，专门用来测代码执行耗时
-from time import perf_counter
 
 
 class LLMClientError(RuntimeError):

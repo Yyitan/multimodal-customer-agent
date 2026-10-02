@@ -7,7 +7,7 @@ os.environ["AGENT_CONVERSATION_DB_PATH"] = ":memory:"
 os.environ["AGENT_SUPPORT_DB_PATH"] = ":memory:"
 
 from app.llm_client import LLMClientError
-from app.main import app, conversation_store, support_store
+from app.main import app, conversation_store
 from app.version import APP_VERSION
 
 """FastAPI 接口层的集成测试脚本"""

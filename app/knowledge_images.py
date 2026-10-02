@@ -1,7 +1,6 @@
 import re
 from pathlib import Path
 
-
 IMAGE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 SUPPORTED_IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
 

@@ -20,22 +20,21 @@ def load_tests(
     from scripts.test_agent_policy import main as test_agent_policy
     from scripts.test_api import main as test_api
     from scripts.test_auth import main as test_auth
+    from scripts.test_benchmark import main as test_benchmark
     from scripts.test_conversation import main as test_conversation
     from scripts.test_evaluation import main as test_evaluation
-    from scripts.test_output_sanitizer import (
-        main as test_output_sanitizer,
-    )
-    from scripts.test_observability import main as test_observability
-    from scripts.test_model_resilience import main as test_model_resilience
-    from scripts.test_knowledge_images import main as test_knowledge_images
-    from scripts.test_web_console import main as test_web_console
-    from scripts.test_benchmark import main as test_benchmark
-    from scripts.test_release import main as test_release
     from scripts.test_image_ranking import (
         main as test_image_ranking,
     )
     from scripts.test_input_security import (
         main as test_input_security,
+    )
+    from scripts.test_knowledge_images import main as test_knowledge_images
+    from scripts.test_llm_router import main as test_llm_router
+    from scripts.test_model_resilience import main as test_model_resilience
+    from scripts.test_observability import main as test_observability
+    from scripts.test_output_sanitizer import (
+        main as test_output_sanitizer,
     )
     from scripts.test_product_confidence import (
         main as test_product_confidence,
@@ -43,16 +42,17 @@ def load_tests(
     from scripts.test_product_strategy_chain import (
         main as test_product_strategy_chain,
     )
+    from scripts.test_query_rewriter import main as test_query_rewriter
     from scripts.test_readiness import main as test_readiness
+    from scripts.test_release import main as test_release
     from scripts.test_request_control import (
         main as test_request_control,
     )
-    from scripts.test_llm_router import main as test_llm_router
-    from scripts.test_query_rewriter import main as test_query_rewriter
     from scripts.test_support_store import main as test_support_store
     from scripts.test_vision_fallback import (
         main as test_vision_fallback,
     )
+    from scripts.test_web_console import main as test_web_console
 
     # `tests` 是列表，每一项是元组：`(测试名称字符串, 测试函数)`
     tests = [

@@ -1,9 +1,9 @@
 from typing import Any
+
 from app.retriever import (
     KNOWLEDGE_RECORDS,
     search_records,
 )
-
 from app.semantic_retriever import semantic_search
 
 """RAG检索模块：混合检索：语义检索+关键词检索+上下文窗口扩展"""

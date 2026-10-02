@@ -2,11 +2,11 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from scripts.evaluate_agent import calculate_metrics
 from scripts.evaluate_generation import (
     check_keyword_groups,
     failed_case_result,
 )
-from scripts.evaluate_agent import calculate_metrics
 from scripts.evaluate_retrieval import collect_image_ranks
 from scripts.evaluation_support import (
     load_cases,

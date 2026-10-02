@@ -8,7 +8,6 @@ from typing import Any
 
 from PIL import Image, UnidentifiedImageError
 
-
 DATA_URL_PATTERN = re.compile(
     r"^data:(image/(?:jpeg|jpg|png|webp));base64,"
     r"([A-Za-z0-9+/]*={0,2})$",

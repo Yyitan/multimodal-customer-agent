@@ -1,5 +1,4 @@
 import os
-from unittest.mock import patch
 
 # `SimpleNamespace`：可以动态造一个对象，用来模拟 settings 配置对象
 from types import SimpleNamespace
@@ -25,6 +24,7 @@ def main() -> None:
         api_token=SecretStr("test-token"),
         llm_provider="mock",
         llm_model="mock",
+        routing_mode="rules",
     )
 
     conversation_store.clear("auth-session")
@@ -106,6 +106,7 @@ def main() -> None:
         api_token=None,
         llm_provider="mock",
         llm_model="mock",
+        routing_mode="rules",
     )
 
     with patch(
@@ -130,6 +131,7 @@ def main() -> None:
         rate_limit_enabled=True,
         llm_provider="mock",
         llm_model="mock",
+        routing_mode="rules",
     )
     test_limiter = SlidingWindowRateLimiter(
         max_requests=1,

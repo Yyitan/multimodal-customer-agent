@@ -10,7 +10,6 @@ from scripts.evaluation_support import (
     write_report,
 )
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CASES_PATH = PROJECT_ROOT / "data" / "evaluation" / "generation_cases.json"
 KNOWLEDGE_RECORDS_PATH = PROJECT_ROOT / "data" / "index" / "knowledge_records.jsonl"
@@ -75,11 +74,6 @@ def evaluate_case(case: dict[str, Any]) -> dict[str, Any]:
     expected_products = {
         IMAGE_PRODUCT[image_id]
         for image_id in expected_image_ids
-        if image_id in IMAGE_PRODUCT
-    }
-    returned_products = {
-        IMAGE_PRODUCT[image_id]
-        for image_id in returned_image_ids
         if image_id in IMAGE_PRODUCT
     }
     wrong_product_images = sorted(

@@ -5,7 +5,6 @@ from typing import Any
 from app.agent_policy import classify_request, review_evidence
 from scripts.evaluation_support import load_cases, select_cases, write_report
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CASES_PATH = PROJECT_ROOT / "data" / "evaluation" / "agent_cases.json"
 DEFAULT_REPORT_PATH = PROJECT_ROOT / "artifacts" / "evaluation" / "agent.json"

@@ -3,7 +3,6 @@ from unittest.mock import patch
 from app.llm_client import LLMResult
 from app.services.chat_service import answer_question
 
-
 QUESTION = "请看图片，这个设备应该怎么更换配件？"
 PRODUCT = "健身追踪器"
 PRODUCT_HINT_LINE = f"图片识别到的产品线索：{PRODUCT}"

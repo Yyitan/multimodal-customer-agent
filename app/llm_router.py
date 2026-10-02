@@ -200,7 +200,7 @@ def route_with_llm(
     if settings.llm_provider == "mock":
         raise RuntimeError("mock provider 不支持 function-calling 路由。")
 
-    client = _client_for(settings)
+    client = client_for(settings)
     started = perf_counter()
 
     request_options: dict[str, Any] = {
@@ -265,7 +265,8 @@ def _get_client(
     )
 
 
-def _client_for(settings: Settings) -> OpenAI:
+def client_for(settings: Settings) -> OpenAI:
+    """按配置返回缓存的 OpenAI 兼容客户端（路由/改写等轻量调用共用）。"""
     return _get_client(
         api_key=(
             settings.llm_api_key.get_secret_value()

@@ -1,11 +1,13 @@
 """FastAPI entry point for the knowledge-based customer-service agent."""
 
+# 增加结构化日志（区分日志等级、写入文件、记录时间、记录异常堆栈，适合后端服务。）
+import logging
 from contextlib import asynccontextmanager
-from secrets import compare_digest
-from typing import Any, Literal
 
 # 生成返回时间戳
 from datetime import datetime, timezone
+from secrets import compare_digest
+from typing import Any, Literal
 
 # 生成随机且几乎不会重复得ID，后面用来生成 session_id
 from uuid import uuid4
@@ -16,10 +18,12 @@ from fastapi import (
     FastAPI,
     Header,
     HTTPException,
-    Path as PathParameter,
     Query,
     Request,
     Response,
+)
+from fastapi import (
+    Path as PathParameter,
 )
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -28,45 +32,42 @@ from fastapi.staticfiles import StaticFiles
 # `field_validator`：Pydantic 的字段校验装饰器，
 from pydantic import BaseModel, Field, field_validator
 
+from app.agent_policy import (
+    classify_request,
+    review_evidence,
+)
 from app.config import (
     PROJECT_ROOT,
     get_settings,
     validate_runtime_settings,
 )
-from app.agent_policy import (
-    classify_request,
-    review_evidence,
+from app.conversation_store import ConversationStore
+from app.input_security import (
+    SESSION_ID_PATTERN,
+    ImageValidationError,
+    RequestBodyLimitMiddleware,
+    validate_image_data_urls,
 )
+from app.knowledge_images import IMAGE_ID_PATTERN, KnowledgeImageCatalog
+from app.llm_client import LLMClientError
 from app.llm_router import (
     needs_llm_routing,
     route_with_llm,
 )
-from app.input_security import (
-    ImageValidationError,
-    RequestBodyLimitMiddleware,
-    SESSION_ID_PATTERN,
-    validate_image_data_urls,
-)
-from app.services.chat_service import answer_question, build_metrics
-from app.llm_client import LLMClientError
-from app.conversation_store import ConversationStore
-from app.semantic_retriever import (
-    semantic_index_status,
-    warm_up_semantic_retriever,
-)
+from app.observability import MetricsMiddleware, MetricsRegistry
 from app.request_control import (
     REQUEST_ID_PATTERN,
     RequestIdMiddleware,
     SlidingWindowRateLimiter,
     rate_limit_key,
 )
-from app.observability import MetricsMiddleware, MetricsRegistry
-from app.knowledge_images import IMAGE_ID_PATTERN, KnowledgeImageCatalog
+from app.semantic_retriever import (
+    semantic_index_status,
+    warm_up_semantic_retriever,
+)
+from app.services.chat_service import answer_question, build_metrics
 from app.support_store import SupportStore
 from app.version import API_PREFIX, APP_NAME, APP_VERSION, CAPABILITIES
-
-# 增加结构化日志（区分日志等级、写入文件、记录时间、记录异常堆栈，适合后端服务。）
-import logging
 
 
 # 请求数据说明书:告诉 FastAPI：用户调用 /chat 时，允许传哪些字段、字段类型是什么、哪些必填。
