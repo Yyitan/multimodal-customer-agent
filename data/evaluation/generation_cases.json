@@ -3,9 +3,19 @@
     "case_id": "drill_temperature",
     "question": "使用 DCB107 或 DCB112 充电器时，电钻电池温度太高为什么不能马上充电？",
     "must_include_any": [
-      ["过热", "高温", "温度"],
-      ["延迟", "暂停"],
-      ["冷却", "恢复"]
+      [
+        "过热",
+        "高温",
+        "温度"
+      ],
+      [
+        "延迟",
+        "暂停"
+      ],
+      [
+        "冷却",
+        "恢复"
+      ]
     ],
     "expected_image_ids": [
       "drill0_06"
@@ -15,9 +25,17 @@
     "case_id": "fitness_tracker_band",
     "question": "我想更换健身追踪器的表带，有其他尺寸可选吗？",
     "must_include_any": [
-      ["表带"],
-      ["小号", "大号"],
-      ["更换", "尺寸"]
+      [
+        "表带"
+      ],
+      [
+        "小号",
+        "大号"
+      ],
+      [
+        "更换",
+        "尺寸"
+      ]
     ],
     "expected_image_ids": [
       "Manual16_51",
@@ -28,9 +46,18 @@
     "case_id": "drill_indicator",
     "question": "我的 DCB107 或 DCB112 型号电钻指示灯闪烁，这些闪烁标识代表什么含义？",
     "must_include_any": [
-      ["DCB107", "DCB112"],
-      ["指示灯", "红色"],
-      ["充电", "故障"]
+      [
+        "DCB107",
+        "DCB112"
+      ],
+      [
+        "指示灯",
+        "红色"
+      ],
+      [
+        "充电",
+        "故障"
+      ]
     ],
     "expected_image_ids": [
       "drill0_04",
@@ -42,9 +69,20 @@
     "case_id": "air_purifier_filter_packaging",
     "question": "新买的空气净化器滤网外面有塑料包装，不拆会有什么问题？",
     "must_include_any": [
-      ["塑料包装", "包装"],
-      ["拆除", "取下"],
-      ["异响", "无法正常工作", "火灾", "损坏"]
+      [
+        "塑料包装",
+        "包装"
+      ],
+      [
+        "拆除",
+        "取下"
+      ],
+      [
+        "异响",
+        "无法正常工作",
+        "火灾",
+        "损坏"
+      ]
     ],
     "expected_image_ids": [
       "Manual03_2"
@@ -54,12 +92,148 @@
     "case_id": "vr_headset_child_age",
     "question": "12岁以下的儿童可以使用这款VR头显吗？",
     "must_include_any": [
-      ["12岁以下", "未满12岁"],
-      ["不适用", "不建议", "不能"],
-      ["安全", "风险", "警告"]
+      [
+        "12岁以下",
+        "未满12岁"
+      ],
+      [
+        "不适用",
+        "不建议",
+        "不能"
+      ],
+      [
+        "安全",
+        "风险",
+        "警告"
+      ]
     ],
     "expected_image_ids": [
       "Manual38_0"
+    ]
+  },
+  {
+    "case_id": "oven_lamp_replace",
+    "question": "烤箱里面的照明灯不亮了，我可以自己更换吗？要注意什么？",
+    "must_include_any": [
+      [
+        "断电",
+        "拔掉电源",
+        "断开电源",
+        "电源"
+      ],
+      [
+        "灯泡",
+        "灯罩"
+      ]
+    ],
+    "expected_image_ids": [
+      "oven_06",
+      "oven_07"
+    ]
+  },
+  {
+    "case_id": "dishwasher_salt_capacity",
+    "question": "洗碗机的软化盐最多能装多少公斤？加完盐之后要注意什么？",
+    "must_include_any": [
+      [
+        "公斤",
+        "kg"
+      ],
+      [
+        "空载",
+        "运行",
+        "冲洗"
+      ]
+    ],
+    "expected_image_ids": [
+      "Dish_washer_03"
+    ]
+  },
+  {
+    "case_id": "generator_indoor_ban",
+    "question": "发电机可以在室内或车库里使用吗？",
+    "must_include_any": [
+      [
+        "密闭",
+        "室内",
+        "车库",
+        "通风"
+      ],
+      [
+        "废气",
+        "中毒",
+        "昏迷",
+        "死亡"
+      ]
+    ],
+    "expected_image_ids": [
+      "generator_01"
+    ]
+  },
+  {
+    "case_id": "thermostat_battery_install",
+    "question": "温控器应该装什么电池？装几节？",
+    "must_include_any": [
+      [
+        "AA",
+        "碱性",
+        "5号"
+      ],
+      [
+        "两",
+        "2",
+        "双"
+      ]
+    ],
+    "expected_image_ids": [
+      "Manual36_22"
+    ]
+  },
+  {
+    "case_id": "mouse_repair_pairing",
+    "question": "蓝牙鼠标和接收器怎么重新配对？",
+    "must_include_any": [
+      [
+        "配对"
+      ],
+      [
+        "重启",
+        "接收器"
+      ]
+    ],
+    "expected_image_ids": [
+      "Manual27_9",
+      "Manual27_11"
+    ]
+  },
+  {
+    "case_id": "pwc_lanyard_usage",
+    "question": "摩托艇的熄火绳有什么用？应该怎么佩戴？",
+    "must_include_any": [
+      [
+        "熄火绳",
+        "卡扣"
+      ],
+      [
+        "手腕"
+      ]
+    ],
+    "expected_image_ids": [
+      "Manual40_15"
+    ]
+  },
+  {
+    "case_id": "bike_seat_tube_limit",
+    "question": "健身单车的座管为什么不能超过限位标记？",
+    "must_include_any": [
+      [
+        "STOP",
+        "限位",
+        "标记"
+      ]
+    ],
+    "expected_image_ids": [
+      "Manual14_12"
     ]
   }
 ]
