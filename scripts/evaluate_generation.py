@@ -107,6 +107,22 @@ def evaluate_case(case: dict[str, Any]) -> dict[str, Any]:
         "wrong_product_images": wrong_product_images,
         "returned_image_ids": returned_image_id_list,
         "reference_count": len(service_result["references"]),
+        "references": [
+            {
+                "chunk_id": reference["chunk_id"],
+                "product": reference["product"],
+                "text": reference["text"][:800],
+            }
+            for reference in (service_result.get("references") or [])
+        ],
+        "usage": {
+            "prompt_tokens": service_result.get("metrics", {}).get("prompt_tokens"),
+            "completion_tokens": service_result.get("metrics", {}).get(
+                "completion_tokens"
+            ),
+            "total_tokens": service_result.get("metrics", {}).get("total_tokens"),
+            "llm_latency_ms": service_result.get("metrics", {}).get("llm_latency_ms"),
+        },
         "returned_image_count": len(returned_image_ids),
         "error": None,
         "passed": passed,
@@ -131,6 +147,8 @@ def failed_case_result(
         "wrong_product_images": [],
         "returned_image_ids": [],
         "reference_count": 0,
+        "references": [],
+        "usage": {},
         "returned_image_count": 0,
         "error": {
             "type": type(error).__name__,
