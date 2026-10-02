@@ -1,0 +1,14 @@
+[
+  {"case_id": "drill_temperature", "human_passed": true, "note": "回答覆盖过热延迟充电原因与冷却恢复，与手册一致"},
+  {"case_id": "fitness_tracker_band", "human_passed": true, "note": "表带尺寸/兼容型号说明准确，配图正确"},
+  {"case_id": "drill_indicator", "human_passed": true, "note": "四种指示灯闪烁状态含义完整，与手册一致"},
+  {"case_id": "air_purifier_filter_packaging", "human_passed": true, "note": "未拆塑料包装的后果回答完整（异响/无法工作/火灾风险）"},
+  {"case_id": "vr_headset_child_age", "human_passed": true, "note": "回答'不适用于12岁以下儿童'事实正确并引用手册；关键词门禁因缺少'安全/风险/警告'字样误判，是关键词口径过严的典型样本"},
+  {"case_id": "oven_lamp_replace", "human_passed": true, "note": "断电前提+更换步骤完整"},
+  {"case_id": "dishwasher_salt_capacity", "human_passed": true, "note": "2公斤上限与加盐后空载运行说明准确；模型另引用盐指示灯片段，选图不同但内容正确"},
+  {"case_id": "generator_indoor_ban", "human_passed": true, "note": "密闭空间禁用+废气中毒警告完整保留"},
+  {"case_id": "thermostat_battery_install", "human_passed": true, "note": "AA碱性电池两节的回答准确"},
+  {"case_id": "mouse_repair_pairing", "human_passed": false, "note": "初次人工复核判通过，judge 指出'按下鼠标底部的配对按钮'后核实：手册只有'USB蓝牙接收器底部的按钮'，模型把接收器步骤迁移到了鼠标上，属真实幻觉，人工标注修正为不通过——judge 抓到了人工与关键词门禁都漏掉的问题"},
+  {"case_id": "pwc_lanyard_usage", "human_passed": true, "note": "熄火绳作用（落水自动停机）与佩戴方法（系左手腕、卡扣接熄火开关）准确"},
+  {"case_id": "bike_seat_tube_limit", "human_passed": true, "note": "STOP限位标记说明正确"}
+]
