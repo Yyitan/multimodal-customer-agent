@@ -4,9 +4,7 @@
 
 当前版本：`3.0.0`
 
-<!-- 推送到 GitHub 后取消注释并替换 <用户名>/<仓库名>：
-[![CI](https://github.com/<用户名>/<仓库名>/actions/workflows/ci.yml/badge.svg)](https://github.com/<用户名>/<仓库名>/actions/workflows/ci.yml)
--->
+[![CI](https://github.com/Yyitan/multimodal-customer-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Yyitan/multimodal-customer-agent/actions/workflows/ci.yml)
 
 ## 演示
 
