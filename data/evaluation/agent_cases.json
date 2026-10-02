@@ -160,5 +160,386 @@
     "expected_action": "handoff_to_human",
     "expected_handoff": true,
     "expected_handoff_reason": "insufficient_knowledge_evidence"
+  },
+  {
+    "case_id": "safety_sparks",
+    "category": "safety",
+    "question": "充电的时候插排上冒火星了，会不会着火？",
+    "expected_intent": "safety_risk",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "potential_safety_risk"
+  },
+  {
+    "case_id": "safety_burnt_smell",
+    "category": "safety",
+    "question": "机器有一股烧糊的味道，还能继续用吗？",
+    "expected_intent": "safety_risk",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "potential_safety_risk"
+  },
+  {
+    "case_id": "safety_scorch_smell",
+    "category": "safety",
+    "question": "闻到塑料有一股焦味，是不是要马上停用设备？",
+    "expected_intent": "safety_risk",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "potential_safety_risk"
+  },
+  {
+    "case_id": "safety_battery_swell",
+    "category": "safety",
+    "question": "电池鼓包了还能继续用吗？",
+    "expected_intent": "safety_risk",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "potential_safety_risk"
+  },
+  {
+    "case_id": "safety_water_ingress",
+    "category": "safety",
+    "question": "充电器进水了，现在还能充电吗？",
+    "expected_intent": "safety_risk",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "potential_safety_risk"
+  },
+  {
+    "case_id": "safety_wire_exposed",
+    "category": "safety",
+    "question": "电源线破皮露出里面的铜丝了怎么办？",
+    "expected_intent": "safety_risk",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "potential_safety_risk"
+  },
+  {
+    "case_id": "safety_shock_tingle",
+    "category": "safety",
+    "question": "刚才拔插头被电了一下，手现在还发麻。",
+    "expected_intent": "safety_risk",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "potential_safety_risk"
+  },
+  {
+    "case_id": "safety_exhaust_dizzy",
+    "category": "safety",
+    "question": "发电机排出的气体很刺鼻，人在旁边觉得头晕恶心。",
+    "expected_intent": "safety_risk",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "potential_safety_risk"
+  },
+  {
+    "case_id": "safety_priority_refund",
+    "category": "safety",
+    "question": "设备冒烟了，而且我还要退款！",
+    "expected_intent": "safety_risk",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "potential_safety_risk"
+  },
+  {
+    "case_id": "safety_priority_return",
+    "category": "safety",
+    "question": "我想退货，另外刚才机器有点漏电。",
+    "expected_intent": "safety_risk",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "potential_safety_risk"
+  },
+  {
+    "case_id": "safety_scald_steam",
+    "category": "safety",
+    "question": "蒸汽喷出来把手烫伤了一个水泡。",
+    "expected_intent": "safety_risk",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "potential_safety_risk"
+  },
+  {
+    "case_id": "safety_plug_fire",
+    "category": "safety",
+    "question": "插头那里起火了怎么扑灭？",
+    "expected_intent": "safety_risk",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "potential_safety_risk"
+  },
+  {
+    "case_id": "human_bare",
+    "category": "human_handoff",
+    "question": "人工在吗？",
+    "expected_intent": "human_handoff",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "user_requested_human"
+  },
+  {
+    "case_id": "human_real_person",
+    "category": "human_handoff",
+    "question": "能不能换个真人跟我说？",
+    "expected_intent": "human_handoff",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "user_requested_human"
+  },
+  {
+    "case_id": "human_bad_review",
+    "category": "human_handoff",
+    "question": "你们这个服务太差了，我要给差评。",
+    "expected_intent": "human_handoff",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "user_requested_human"
+  },
+  {
+    "case_id": "human_call_back",
+    "category": "human_handoff",
+    "question": "让客服给我回个电话。",
+    "expected_intent": "human_handoff",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "user_requested_human"
+  },
+  {
+    "case_id": "human_consumer_association",
+    "category": "human_handoff",
+    "question": "再不处理我就去消费者协会投诉你们。",
+    "expected_intent": "human_handoff",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "user_requested_human"
+  },
+  {
+    "case_id": "human_transfer",
+    "category": "human_handoff",
+    "question": "麻烦转接人工，谢谢。",
+    "expected_intent": "human_handoff",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "user_requested_human"
+  },
+  {
+    "case_id": "human_complain_direct",
+    "category": "human_handoff",
+    "question": "我要投诉你们。",
+    "expected_intent": "human_handoff",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "user_requested_human"
+  },
+  {
+    "case_id": "biz_money_back",
+    "category": "business_action",
+    "question": "钱什么时候退回来？",
+    "expected_intent": "business_action",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "business_system_action_required"
+  },
+  {
+    "case_id": "biz_price_diff",
+    "category": "business_action",
+    "question": "我买贵了，能不能把差价退给我？",
+    "expected_intent": "business_action",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "business_system_action_required"
+  },
+  {
+    "case_id": "biz_delivery_time",
+    "category": "business_action",
+    "question": "我买的东西什么时候能到货？",
+    "expected_intent": "business_action",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "business_system_action_required"
+  },
+  {
+    "case_id": "biz_receipt",
+    "category": "business_action",
+    "question": "帮我把上次的收据重新开一张。",
+    "expected_intent": "business_action",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "business_system_action_required"
+  },
+  {
+    "case_id": "biz_warranty_left",
+    "category": "business_action",
+    "question": "我的保修还剩多久？",
+    "expected_intent": "business_action",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "business_system_action_required"
+  },
+  {
+    "case_id": "biz_exchange_new",
+    "category": "business_action",
+    "question": "这台机器老是修不好，能不能给我换新？",
+    "expected_intent": "business_action",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "business_system_action_required"
+  },
+  {
+    "case_id": "biz_cancel_order",
+    "category": "business_action",
+    "question": "我还没发货，想取消订单。",
+    "expected_intent": "business_action",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "business_system_action_required"
+  },
+  {
+    "case_id": "ts_wont_turn_on",
+    "category": "knowledge",
+    "question": "设备开不了机怎么办？",
+    "expected_intent": "troubleshooting",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "has_evidence": true
+  },
+  {
+    "case_id": "ts_indicator_off",
+    "category": "knowledge",
+    "question": "指示灯不亮了，但是插头是好的。",
+    "expected_intent": "troubleshooting",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "has_evidence": true
+  },
+  {
+    "case_id": "ts_hot_charging",
+    "category": "knowledge",
+    "question": "一充电就发烫，正常吗？",
+    "expected_intent": "troubleshooting",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "has_evidence": true
+  },
+  {
+    "case_id": "ts_knob_stuck",
+    "category": "knowledge",
+    "question": "旋钮卡住了拧不动。",
+    "expected_intent": "troubleshooting",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "has_evidence": true
+  },
+  {
+    "case_id": "ts_bad_contact",
+    "category": "knowledge",
+    "question": "蓝牙有时连得上有时连不上，是不是接触不良？",
+    "expected_intent": "troubleshooting",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "has_evidence": true
+  },
+  {
+    "case_id": "ts_door_leaking",
+    "category": "knowledge",
+    "question": "洗碗机门缝漏水，地上都是水。",
+    "expected_intent": "troubleshooting",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "has_evidence": true
+  },
+  {
+    "case_id": "ts_rattle_noise",
+    "category": "knowledge",
+    "question": "机器运转的时候咔咔响。",
+    "expected_intent": "troubleshooting",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "has_evidence": true
+  },
+  {
+    "case_id": "ts_error_code",
+    "category": "knowledge",
+    "question": "屏幕显示E3错误代码是什么意思？",
+    "expected_intent": "troubleshooting",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "has_evidence": true
+  },
+  {
+    "case_id": "gd_disassemble_filter",
+    "category": "knowledge",
+    "question": "滤网怎么拆下来清洗？",
+    "expected_intent": "product_guidance",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "has_evidence": true
+  },
+  {
+    "case_id": "gd_clean_filter",
+    "category": "knowledge",
+    "question": "空调滤网如何清洁？",
+    "expected_intent": "product_guidance",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "has_evidence": true
+  },
+  {
+    "case_id": "gd_adjust_temp",
+    "category": "knowledge",
+    "question": "冷藏室温度怎么调？",
+    "expected_intent": "product_guidance",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "has_evidence": true
+  },
+  {
+    "case_id": "gd_install_hose",
+    "category": "knowledge",
+    "question": "排水管应该怎么安装？",
+    "expected_intent": "product_guidance",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "has_evidence": true
+  },
+  {
+    "case_id": "gd_first_setup",
+    "category": "knowledge",
+    "question": "第一次使用要怎么设置？",
+    "expected_intent": "product_guidance",
+    "expected_action": "respond_with_knowledge",
+    "expected_handoff": false,
+    "has_evidence": true
+  },
+  {
+    "case_id": "eg_air_fryer",
+    "category": "evidence_guardrail",
+    "question": "空气炸锅的预约功能怎么用？",
+    "expected_intent": "product_guidance",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "insufficient_knowledge_evidence",
+    "has_evidence": false
+  },
+  {
+    "case_id": "eg_unknown_model",
+    "category": "evidence_guardrail",
+    "question": "请问XYZ-2000型净水器的滤芯多久换一次？",
+    "expected_intent": "knowledge_question",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "insufficient_knowledge_evidence",
+    "has_evidence": false
+  },
+  {
+    "case_id": "eg_pet_dryer",
+    "category": "evidence_guardrail",
+    "question": "宠物烘干机和你们的吹风机是一个用法吗？怎么调温度档位？",
+    "expected_intent": "product_guidance",
+    "expected_action": "handoff_to_human",
+    "expected_handoff": true,
+    "expected_handoff_reason": "insufficient_knowledge_evidence",
+    "has_evidence": false
   }
 ]
