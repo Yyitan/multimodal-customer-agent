@@ -1,5 +1,5 @@
 APP_NAME = "multimodal-customer-agent"
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.1.0"
 API_PREFIX = "/v1"
 
 CAPABILITIES = (

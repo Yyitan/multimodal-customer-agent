@@ -16,7 +16,7 @@ def main() -> None:
     compose = (PROJECT_ROOT / "compose.yaml").read_text(encoding="utf-8")
 
     checks["应用版本和OpenAPI版本一致"] = (
-        APP_VERSION == "2.0.0" and app.version == APP_VERSION
+        APP_VERSION == "2.1.0" and app.version == APP_VERSION
     )
     checks["README记录当前版本和核心接口"] = (
         f"当前版本：`{APP_VERSION}`" in readme
