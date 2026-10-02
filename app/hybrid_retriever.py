@@ -26,18 +26,51 @@ PRODUCT_NAMES = sorted(
     reverse=True,
 )
 
+# 产品别名词典：口语简称和产品特有部件词 -> 标准产品名。
+# 动机：评测发现"鼠标用几号电池"无法命中产品名"蓝牙激光鼠标"，
+# "冷藏室的温度怎么调节"无法命中"冰箱"，导致产品硬过滤失效，
+# 跨产品记录混入上下文。命中别名与命中产品名同等生效。
+# 注意：别名词是启发式，命中后走硬过滤；若问题同时提到多个产品，
+# 仍按"标准产品名优先、别名兜底"的顺序取第一个命中。
+PRODUCT_ALIASES = {
+    "vr": "VR头显",
+    "头显": "VR头显",
+    "鼠标": "蓝牙激光鼠标",
+    "键盘": "功能键盘",
+    "手环": "健身追踪器",
+    "手表": "健身追踪器",
+    "温控器": "可编程温控器",
+    "净化器": "空气净化器",
+    "工学椅": "人体工学椅",
+    "电竞椅": "人体工学椅",
+    "电动车": "儿童电动摩托车",
+    "冷藏室": "冰箱",
+    "冷冻室": "冰箱",
+    "水上摩托": "摩托艇",
+    "发电机组": "发电机",
+    "蒸汽拖把": "蒸汽清洁机",
+    "清洁机": "蒸汽清洁机",
+    "健身车": "健身单车",
+    "单车": "健身单车",
+}
 
-def dectect_product(query: str) -> str | None:
-    """从用户问题中识别明确提到的产品名称。"""
+
+def detect_product(query: str) -> str | None:
+    """从用户问题中识别明确提到或通过别名指代的产品。"""
     clean_query = query.strip().lower()
 
     if not clean_query:
         return None
 
+    # 标准产品名优先匹配（长名在前），避免"蓝牙激光鼠标"被别名"鼠标"抢先。
     for product in PRODUCT_NAMES:
         if product.lower() in clean_query:
             return product
-    # 问题里没有明确产品名，就返回None
+    # 问题里没有标准产品名时，再尝试别名映射。
+    for alias, product in PRODUCT_ALIASES.items():
+        if alias in clean_query:
+            return product
+    # 都没有命中，返回None
     return None
 
 
@@ -52,7 +85,7 @@ def build_candidates(
 ) -> list[dict[str, Any]]:
     """合并关键词结果和语义结果，并计算混合分数。"""
     # 先判断问题中是否明确提到了某个产品
-    target_product = dectect_product(query)
+    target_product = detect_product(query)
 
     # 如果识别到了产品，语义检索先多取一些候选。
     # 原因：假设只取20条，其中有3条相机记录。如果取完前20条后过滤，相机记录会被删掉，所以先取semantic_top_k * 3 条，再过滤产品，以保留足够多的目标产品记录。
