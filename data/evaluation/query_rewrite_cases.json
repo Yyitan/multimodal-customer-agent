@@ -1,0 +1,98 @@
+[
+  {
+    "case_id": "mt_dishwasher_salt",
+    "turn1_question": "洗碗机软化盐一次最多加多少？",
+    "turn1_answer": "盐箱约可装入2公斤软化盐。",
+    "turn2_question": "那加完之后还要做什么？",
+    "expected_product": "洗碗机",
+    "expected_image_ids": ["Dish_washer_03"]
+  },
+  {
+    "case_id": "mt_fridge_replug",
+    "turn1_question": "冰箱断电后重新通电有什么讲究？",
+    "turn1_answer": "重新插拔插头时需要等待5分钟或更长时间，否则可能导致冰箱运行故障。",
+    "turn2_question": "具体要等多久才能插回去？",
+    "expected_product": "冰箱",
+    "expected_image_ids": ["Manual17_10"]
+  },
+  {
+    "case_id": "mt_generator_smoking",
+    "turn1_question": "给发电机加油时有哪些注意事项？",
+    "turn1_answer": "加油时务必关闭发动机，不要将燃油洒在发动机或消音器上。",
+    "turn2_question": "在旁边抽烟行吗？",
+    "expected_product": "发电机",
+    "expected_image_ids": ["generator_21"]
+  },
+  {
+    "case_id": "mt_thermostat_battery",
+    "turn1_question": "温控器怎么安装电池？",
+    "turn1_answer": "在温控器背面装入两节AA碱性电池。",
+    "turn2_question": "它用什么型号的电池？",
+    "expected_product": "可编程温控器",
+    "expected_image_ids": ["Manual36_22"]
+  },
+  {
+    "case_id": "mt_steam_no_water",
+    "turn1_question": "蒸汽清洁机的水箱怎么加水？",
+    "turn1_answer": "使用配套量杯加水，或按下水箱解锁扣取下水箱在水槽加水。",
+    "turn2_question": "如果里面没水了机器会怎么样？",
+    "expected_product": "蒸汽清洁机",
+    "expected_image_ids": ["Manual05_8"]
+  },
+  {
+    "case_id": "mt_oven_lamp",
+    "turn1_question": "烤箱的照明灯泡怎么更换？",
+    "turn1_answer": "断开烤箱电源，拧下灯罩，更换灯泡后再拧回灯罩。",
+    "turn2_question": "换之前一定要断电吗？",
+    "expected_product": "烤箱",
+    "expected_image_ids": ["oven_06"]
+  },
+  {
+    "case_id": "mt_mouse_battery",
+    "turn1_question": "蓝牙鼠标用什么电池？",
+    "turn1_answer": "使用两节AA电池。",
+    "turn2_question": "装的时候有什么要注意的？",
+    "expected_product": "蓝牙激光鼠标",
+    "expected_image_ids": ["Manual27_2"]
+  },
+  {
+    "case_id": "mt_vr_cleaning",
+    "turn1_question": "VR头显怎么清洁保养？",
+    "turn1_answer": "出于安全考虑，清洁前请拔下电源线并断开其他所有线缆。",
+    "turn2_question": "清洁的时候线缆怎么处理？",
+    "expected_product": "VR头显",
+    "expected_image_ids": ["Manual38_5"]
+  },
+  {
+    "case_id": "mt_bike_seat",
+    "turn1_question": "健身单车的座管高度怎么调？",
+    "turn1_answer": "松开调节旋钮调整座管高度，然后拧紧旋钮。",
+    "turn2_question": "最高不能超过哪里？",
+    "expected_product": "健身单车",
+    "expected_image_ids": ["Manual14_12"]
+  },
+  {
+    "case_id": "mt_ac_selfclean",
+    "turn1_question": "空调的自清洁功能怎么用？",
+    "turn1_answer": "开启自清洁功能即可，运行时部分按键无法使用。",
+    "turn2_question": "为什么结束后风还在吹？",
+    "expected_product": "空调",
+    "expected_image_ids": ["Manual01_18"]
+  },
+  {
+    "case_id": "mt_generator_eco",
+    "turn1_question": "发电机怎么使用更省油？",
+    "turn1_answer": "把经济控制开关置于Ⅰ档，经济控制单元会根据外接负载调节发动机转速，降低油耗。",
+    "turn2_question": "带大功率设备时那个开关要怎么设置？",
+    "expected_product": "发电机",
+    "expected_image_ids": ["generator_08"]
+  },
+  {
+    "case_id": "mt_camera_charge",
+    "turn1_question": "相机电池怎么充电？",
+    "turn1_answer": "将电池装入充电器并连接电源，注意电池的安装方向。",
+    "turn2_question": "充电的时候有什么要注意的吗？",
+    "expected_product": "相机",
+    "expected_image_ids": ["Manual29_16"]
+  }
+]
