@@ -130,3 +130,16 @@ python -m scripts.benchmark_api `
 - 数据库变更应保持向后兼容；v2 启动时会把旧纳秒时间戳迁移为 Unix 秒。
 - 回滚前备份两个 SQLite 数据库。
 - 回滚后检查服务版本、就绪状态、工单读取和一次 Mock/真实请求。
+
+## 从零到公网（十步清单）
+
+1. 购买 VPS（1C2G 起步即可，Ubuntu 22.04+）并安装 Docker Compose。
+2. 域名解析 A 记录到服务器 IP。
+3. 克隆仓库，`Copy-Item`/`cp .env.production.example .env`，填入真实模型 Key 与强随机 `AGENT_API_TOKEN`。
+4. `AGENT_AUTH_ENABLED=true`、`AGENT_RATE_LIMIT_ENABLED=true`（生产强制项，启动校验会拦截缺省）。
+5. `docker compose up --build -d`，确认 `docker compose ps` 健康、`curl /v1/ready` 返回 ready。
+6. 安装 Caddy 或 Nginx + certbot 做反向代理与 HTTPS，转发到 8000 端口，禁用直连 IP 访问。
+7. 工作台填入 API Token，验证一次真实问答、工单创建与状态流转。
+8. 配置日志轮转与 SQLite 数据库定时备份（命名卷路径见 compose.yaml）。
+9. 在目标环境重跑 `benchmark_api`（放宽 P95 阈值）与 `evaluate_generation`，记录真实基线。
+10. 邀请真实用户使用，收集反馈与低分工单，驱动评测集与规则迭代。

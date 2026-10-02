@@ -7,3 +7,4 @@ data/*.db
 data/*.db-*
 data/runtime/
 artifacts/
+tmp/

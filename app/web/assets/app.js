@@ -447,6 +447,12 @@ async function advanceTicket(ticket) {
   }
 }
 
+function switchView(viewName) {
+  const target = document.querySelector(`.nav-item[data-view="${viewName}"]`);
+  if (!target) return;
+  target.click();
+}
+
 document.querySelectorAll(".nav-item").forEach((button) => {
   button.addEventListener("click", () => {
     document.querySelectorAll(".nav-item").forEach((item) => {
@@ -461,6 +467,12 @@ document.querySelectorAll(".nav-item").forEach((button) => {
     }
   });
 });
+
+// 深链接：支持 ?view=tickets 直达工单队列，便于分享与自动化截图
+const requestedView = new URLSearchParams(window.location.search).get("view");
+if (requestedView) {
+  switchView(requestedView);
+}
 
 document.querySelectorAll("[data-question]").forEach((button) => {
   button.addEventListener("click", () => {

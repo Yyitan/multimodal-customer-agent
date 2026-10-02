@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.0.0] - 2026-10-02
+
+### Added
+
+- 大模型 function-calling 路由与三档路由模式（rules / llm / hybrid），含 59 案例三档对比实验。
+- LLM-as-judge 生成质量评审（忠实性/相关性/完整性/安全性四维度，与人工标注一致率 100%）。
+- SSE 流式对话接口 `/v1/chat/stream`（routing/references/delta/done 事件）。
+- 多轮检索改写（`query_rewriter`，默认关闭）与 12 组两轮对话消融案例。
+- 检索消融实验脚本、产品别名词典（19 条）与已知失败（xfail）评测机制。
+- 评测集扩容：检索 13→56、Agent 17→59（对抗案例，规则迭代 45.76%→100%）、生成 5→12。
+- pytest 测试入口、ruff + pyproject、MIT LICENSE、工作台深链接与 README 演示截图。
+
+### Changed
+
+- 图片选择提示词与引用片段对齐；生成评测图片判分改为"跨产品污染门禁 + 双参考指标"。
+- 路由规则基于对抗案例失败分析全面加固（转人工 Recall 50%→100%）。
+- CI 新增 ruff 与 pytest 步骤；默认评测文本模型切换为智谱 `glm-4.5-flash`（免费）。
+
 ## [2.1.0] - 2026-10-02
 
 ### Added
