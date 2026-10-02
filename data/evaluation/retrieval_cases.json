@@ -105,5 +105,357 @@
     "expected_image_ids": [
       "Manual29_11"
     ]
+  },
+  {
+    "case_id": "fridge_replug_interval",
+    "question": "冰箱断电之后重新插上插头，需要间隔多长时间？",
+    "expected_product": "冰箱",
+    "expected_image_ids": [
+      "Manual17_10"
+    ]
+  },
+  {
+    "case_id": "fridge_lamp_unplug",
+    "question": "更换冰箱内部的灯泡之前，需要先做什么安全操作？",
+    "expected_product": "冰箱",
+    "expected_image_ids": [
+      "Manual17_4"
+    ]
+  },
+  {
+    "case_id": "fridge_temp_adjust",
+    "question": "冷藏室的温度怎么调节？每次调节变化多少度？",
+    "expected_product": "冰箱",
+    "expected_image_ids": [
+      "Manual17_41"
+    ]
+  },
+  {
+    "case_id": "fridge_child_entrapment",
+    "question": "怎么防止小孩爬进冰箱里面发生危险？",
+    "expected_product": "冰箱",
+    "expected_image_ids": [
+      "Manual17_13"
+    ]
+  },
+  {
+    "case_id": "dryer_ppe",
+    "question": "操作吹风机的时候需要佩戴哪些个人防护装备？",
+    "expected_product": "吹风机",
+    "expected_image_ids": [
+      "Manual04_3"
+    ]
+  },
+  {
+    "case_id": "dryer_bystander_distance",
+    "question": "使用吹风机作业时，无关人员和动物要离多远？",
+    "expected_product": "吹风机",
+    "expected_image_ids": [
+      "Manual04_5"
+    ]
+  },
+  {
+    "case_id": "dishwasher_softener_first_use",
+    "question": "洗碗机第一次使用前，软水系统应该怎么处理？",
+    "expected_product": "洗碗机",
+    "expected_image_ids": [
+      "Dish_washer_01"
+    ]
+  },
+  {
+    "case_id": "dishwasher_salt_capacity",
+    "question": "洗碗机的盐箱最多能装多少公斤软化盐？",
+    "expected_product": "洗碗机",
+    "expected_image_ids": [
+      "Dish_washer_03"
+    ]
+  },
+  {
+    "case_id": "dishwasher_detergent_box",
+    "question": "洗碗机的洗涤剂应该加在哪个位置？",
+    "expected_product": "洗碗机",
+    "expected_image_ids": [
+      "Manual06_4"
+    ]
+  },
+  {
+    "case_id": "dishwasher_drain_length",
+    "question": "洗碗机的排水管最长不能超过几米？",
+    "expected_product": "洗碗机",
+    "expected_image_ids": [
+      "Manual06_3"
+    ]
+  },
+  {
+    "case_id": "oven_lamp_replace",
+    "question": "烤箱的照明灯泡应该怎么更换？",
+    "expected_product": "烤箱",
+    "expected_image_ids": [
+      "oven_06",
+      "oven_07"
+    ]
+  },
+  {
+    "case_id": "oven_door_removal",
+    "question": "烤箱门怎么拆下来？",
+    "expected_product": "烤箱",
+    "expected_image_ids": [
+      "oven_02"
+    ]
+  },
+  {
+    "case_id": "pwc_practice_depth",
+    "question": "练习驾驶摩托艇时，水深至少要达到多少？",
+    "expected_product": "摩托艇",
+    "expected_image_ids": [
+      "Manual40_5"
+    ]
+  },
+  {
+    "case_id": "pwc_engine_stop",
+    "question": "摩托艇的发动机怎么停止？",
+    "expected_product": "摩托艇",
+    "expected_image_ids": [
+      "Manual40_9",
+      "Manual40_10"
+    ]
+  },
+  {
+    "case_id": "pwc_lanyard_wrist",
+    "question": "摩托艇的熄火绳应该系在哪里？",
+    "expected_product": "摩托艇",
+    "expected_image_ids": [
+      "Manual40_15"
+    ]
+  },
+  {
+    "case_id": "mouse_battery_install",
+    "question": "蓝牙鼠标的电池应该怎么安装？",
+    "expected_product": "蓝牙激光鼠标",
+    "expected_image_ids": [
+      "Manual27_2"
+    ]
+  },
+  {
+    "case_id": "mouse_repair_pairing",
+    "question": "蓝牙鼠标怎么和接收器重新配对？",
+    "expected_product": "蓝牙激光鼠标",
+    "expected_image_ids": [
+      "Manual27_9",
+      "Manual27_11"
+    ]
+  },
+  {
+    "case_id": "bike_seat_tube_limit",
+    "question": "健身单车的座管调节到什么位置就不能再往上调了？",
+    "expected_product": "健身单车",
+    "expected_image_ids": [
+      "Manual14_12"
+    ]
+  },
+  {
+    "case_id": "bike_pedal_direction",
+    "question": "安装健身单车的脚踏板时有什么方向要求？",
+    "expected_product": "健身单车",
+    "expected_image_ids": [
+      "Manual14_14"
+    ]
+  },
+  {
+    "case_id": "bike_max_load",
+    "question": "健身单车最大能承受多重的使用者？",
+    "expected_product": "健身单车",
+    "expected_image_ids": [
+      "Manual14_2"
+    ]
+  },
+  {
+    "case_id": "generator_indoor_exhaust",
+    "question": "发电机为什么不能在密闭空间里启动？",
+    "expected_product": "发电机",
+    "expected_image_ids": [
+      "generator_01"
+    ]
+  },
+  {
+    "case_id": "generator_refuel_fire",
+    "question": "给发电机加油时有哪些防火要求？",
+    "expected_product": "发电机",
+    "expected_image_ids": [
+      "generator_20",
+      "generator_21"
+    ]
+  },
+  {
+    "case_id": "generator_eco_switch",
+    "question": "发电机的经济控制开关有什么作用？",
+    "expected_product": "发电机",
+    "expected_image_ids": [
+      "generator_07"
+    ]
+  },
+  {
+    "case_id": "generator_home_wiring",
+    "question": "发电机接入建筑物电气系统有什么要求？",
+    "expected_product": "发电机",
+    "expected_image_ids": [
+      "Manual18_17"
+    ],
+    "known_failure": true,
+    "known_failure_reason": "语义相近的接地/导线片段挤掉目标接线片段,目标chunk排在top20之外,待重排优化"
+  },
+  {
+    "case_id": "ac_remote_extra_keys",
+    "question": "空调遥控器的附加功能按键在什么位置？",
+    "expected_product": "空调",
+    "expected_image_ids": [
+      "air_conditioner_01"
+    ]
+  },
+  {
+    "case_id": "ac_selfclean_fan",
+    "question": "空调自清洁功能结束后，风扇为什么还在继续转？",
+    "expected_product": "空调",
+    "expected_image_ids": [
+      "Manual01_18"
+    ]
+  },
+  {
+    "case_id": "camera_battery_charging",
+    "question": "给相机电池充电时要注意安装方向吗？",
+    "expected_product": "相机",
+    "expected_image_ids": [
+      "Manual29_16"
+    ]
+  },
+  {
+    "case_id": "camera_memory_card_icon",
+    "question": "相机插入存储卡后，屏幕显示会有什么变化？",
+    "expected_product": "相机",
+    "expected_image_ids": [
+      "Manual29_8"
+    ]
+  },
+  {
+    "case_id": "drill_battery_catalog_voltage",
+    "question": "订购电钻替换电池组时为什么要提供产品目录号和电压？",
+    "expected_product": "电钻",
+    "expected_image_ids": [
+      "Manual11_1"
+    ]
+  },
+  {
+    "case_id": "tracker_first_charge",
+    "question": "健身追踪器第一次使用前怎么充电？",
+    "expected_product": "健身追踪器",
+    "expected_image_ids": [
+      "fitness_trackers_01"
+    ]
+  },
+  {
+    "case_id": "tracker_charging_cable",
+    "question": "健身追踪器的包装里附带充电线吗？",
+    "expected_product": "健身追踪器",
+    "expected_image_ids": [
+      "fitness_trackers_02"
+    ]
+  },
+  {
+    "case_id": "vr_earcups_replace",
+    "question": "VR头显的耳塞尺寸不合适可以更换吗？",
+    "expected_product": "VR头显",
+    "expected_image_ids": [
+      "Manual38_4"
+    ]
+  },
+  {
+    "case_id": "vr_cleaning_unplug",
+    "question": "清洁VR头显之前应该先做什么？",
+    "expected_product": "VR头显",
+    "expected_image_ids": [
+      "Manual38_5"
+    ]
+  },
+  {
+    "case_id": "purifier_air_indicator",
+    "question": "空气净化器的空气质量指示灯为什么对有些污染物没有反应？",
+    "expected_product": "空气净化器",
+    "expected_image_ids": [
+      "Manual03_21"
+    ]
+  },
+  {
+    "case_id": "thermostat_install_battery",
+    "question": "可编程温控器应该安装什么型号的电池？",
+    "expected_product": "可编程温控器",
+    "expected_image_ids": [
+      "Manual36_22"
+    ]
+  },
+  {
+    "case_id": "thermostat_wiring_photo",
+    "question": "拆卸温控器之前为什么要给接线拍照？",
+    "expected_product": "可编程温控器",
+    "expected_image_ids": [
+      "Manual36_9"
+    ]
+  },
+  {
+    "case_id": "steam_refill_water",
+    "question": "蒸汽清洁机的水箱怎么加水？",
+    "expected_product": "蒸汽清洁机",
+    "expected_image_ids": [
+      "Manual05_7",
+      "Manual05_8"
+    ]
+  },
+  {
+    "case_id": "adv_fridge_replug_colloquial",
+    "question": "冰箱拔了插头马上又插回去行不行啊？",
+    "expected_product": "冰箱",
+    "expected_image_ids": [
+      "Manual17_10"
+    ]
+  },
+  {
+    "case_id": "adv_oven_lamp_typo",
+    "question": "烤箱灯抱坏了怎么换新的？",
+    "expected_product": "烤箱",
+    "expected_image_ids": [
+      "oven_06",
+      "oven_07"
+    ]
+  },
+  {
+    "case_id": "adv_mouse_battery_shorthand",
+    "question": "鼠标用几号电池？",
+    "expected_product": "蓝牙激光鼠标",
+    "expected_image_ids": [
+      "Manual27_2"
+    ]
+  },
+  {
+    "case_id": "adv_dishwasher_salt_colloquial",
+    "question": "洗碗机里那袋盐是拿来干嘛的？",
+    "expected_product": "洗碗机",
+    "expected_image_ids": [
+      "Dish_washer_02"
+    ]
+  },
+  {
+    "case_id": "adv_generator_indoor_colloquial",
+    "question": "发电机放屋里用行吗？",
+    "expected_product": "发电机",
+    "expected_image_ids": [
+      "generator_01"
+    ]
+  },
+  {
+    "case_id": "adv_kids_backrest_colloquial",
+    "question": "小孩子骑的那个电动车后靠背咋装？",
+    "expected_product": "儿童电动摩托车",
+    "expected_image_ids": [
+      "Manual26_14"
+    ]
   }
 ]
